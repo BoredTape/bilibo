@@ -1,0 +1,5 @@
+.vscode/*
+config.yaml
+data.db
+dist/*
+build/*

@@ -1,0 +1,14 @@
+server:
+  # web host&port
+  host: 0.0.0.0
+  port: 8088
+  # database config,support sqlite and mysql
+  db:
+    driver: sqlite
+    dsn: data.db
+    # driver: mysql
+    # dsn: user:pass@tcp(127.0.0.1:3306)/dbname?charset=utf8mb4&parseTime=True&loc=Local
+
+# video download config, for now just set video download path
+download:
+  path: /data/downloads

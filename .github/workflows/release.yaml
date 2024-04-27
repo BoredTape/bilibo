@@ -1,0 +1,40 @@
+name: Auto Release
+
+on:
+  push:
+    tags:
+      - "*"
+
+jobs:
+  release:
+    strategy:
+      matrix:
+        platform: [ubuntu-latest]
+        go-version: ["1.22"]
+    name: Release
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - name: 检查master分支
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go-version }}
+
+      - name: Install dependencies
+        run: |
+          sudo snap install zig --classic --beta
+          docker pull crazymax/xgo:latest
+          go install github.com/crazy-max/xgo@latest
+          sudo apt install upx
+
+      - name: Build
+        run: |
+          bash build.sh release
+
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            build/compress/*
