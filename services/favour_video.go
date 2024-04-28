@@ -31,7 +31,11 @@ func (f *FavourVideoService) Save() {
 	}).FirstOrInit(&favourVideo)
 	needUpdata := false
 	if favourVideo.ID == 0 {
-		favourVideo.Status = consts.VIDEO_STATUS_TO_BE_DOWNLOAD
+		favInfo := GetFavourInfoByMlid(f.V.Mlid)
+		favourVideo.Status = consts.VIDEO_STATUS_INIT
+		if favInfo != nil && favInfo.Sync == consts.FAVOUR_NEED_SYNC {
+			favourVideo.Status = consts.VIDEO_STATUS_TO_BE_DOWNLOAD
+		}
 		needUpdata = true
 	}
 	if favourVideo.Part != f.V.Part {
@@ -147,41 +151,29 @@ type VideoInfo struct {
 	AccountName string `json:"account_name"`
 }
 
+func handleQueryStatus(status int) []int {
+	statusList := []int{status}
+	if status == consts.VIDEO_STATUS_DOWNLOAD_FAIL {
+		statusList = append(statusList, consts.VIDEO_STATUS_DOWNLOAD_RETRY)
+	}
+	return statusList
+
+}
+
 func GetVideosByStatus(status, page, pageSize int) (*[]*VideoInfo, int64) {
 	result := make([]*VideoInfo, 0)
 	db := models.GetDB()
 	var total int64
 
-	statusList := []int{status}
+	statusList := handleQueryStatus(status)
 
-	var mlids []int
-	if status == consts.VIDEO_STATUS_TO_BE_DOWNLOAD {
-		var syncFav []models.FavourFoldersInfo
-		db.Model(&models.FavourFoldersInfo{}).Where(&models.FavourFoldersInfo{Sync: consts.FAVOUR_NEED_SYNC}).Find(&syncFav)
-		for _, v := range syncFav {
-			mlids = append(mlids, v.Mlid)
-		}
-	}
+	query := db.Model(&models.FavourVideos{}).Where("status IN (?)", statusList)
 
-	if status == consts.VIDEO_STATUS_DOWNLOAD_FAIL {
-		statusList = append(statusList, consts.VIDEO_STATUS_DOWNLOAD_RETRY)
-	}
-
-	if len(mlids) > 0 && status == consts.VIDEO_STATUS_TO_BE_DOWNLOAD {
-		db.Model(&models.FavourVideos{}).Where("mlid IN (?) AND status = ?", mlids, status).Count(&total)
-	} else if len(mlids) < 1 && status == consts.VIDEO_STATUS_TO_BE_DOWNLOAD {
-		return &result, 0
-	} else {
-		db.Model(&models.FavourVideos{}).Where("status IN (?)", statusList).Count(&total)
-	}
+	query.Count(&total)
 
 	if total > 0 {
 		var favourVideos []models.FavourVideos
-		if status == consts.VIDEO_STATUS_TO_BE_DOWNLOAD {
-			db.Model(&models.FavourVideos{}).Where("mlid IN (?) AND status = ?", mlids, status).Limit(pageSize).Offset((page - 1) * pageSize).Find(&favourVideos)
-		} else {
-			db.Model(&models.FavourVideos{}).Where("status IN (?)", statusList).Limit(pageSize).Offset((page - 1) * pageSize).Find(&favourVideos)
-		}
+		query.Order("updated_at DESC").Limit(pageSize).Offset((page - 1) * pageSize).Find(&favourVideos)
 		accountMap := make(map[int]*AccountInfo, 0)
 		favMap := make(map[int]*FavourFolders, 0)
 		for _, v := range favourVideos {
