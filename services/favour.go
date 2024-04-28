@@ -132,6 +132,9 @@ func GetAccountFavourInfoByMid(mid int) *[]*FavourFolders {
 func SetFavourSyncStatus(mid, mlid, status int) {
 	db := models.GetDB()
 	db.Model(&models.FavourFoldersInfo{}).Where("mlid = ?", mlid).Update("sync", status)
+	if status == consts.FAVOUR_NEED_SYNC {
+		db.Model(&models.FavourVideos{}).Where("mid = ? AND mlid = ? AND status = ?", mid, mlid, consts.VIDEO_STATUS_INIT).Update("status", consts.VIDEO_STATUS_TO_BE_DOWNLOAD)
+	}
 }
 
 type FavFile struct {

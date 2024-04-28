@@ -96,10 +96,11 @@ type AccountInfo struct {
 func AccountList(page, pageSize int) (*[]*AccountInfo, int64) {
 	db := models.GetDB()
 	accountMap := make(map[int]*AccountInfo, 0)
+	accountMids := make([]int, 0)
 	total := AccountTotal()
 	if total > 0 {
 		var datas []models.BiliAccounts
-		db.Model(&models.BiliAccounts{}).Limit(pageSize).Offset((page - 1) * pageSize).Find(&datas)
+		db.Model(&models.BiliAccounts{}).Order("updated_at DESC").Limit(pageSize).Offset((page - 1) * pageSize).Find(&datas)
 		for _, data := range datas {
 			item := AccountInfo{
 				Mid:    data.Mid,
@@ -114,10 +115,11 @@ func AccountList(page, pageSize int) (*[]*AccountInfo, int64) {
 				FoldersCount: 0,
 			}
 			accountMap[data.Mid] = &item
+			accountMids = append(accountMids, data.Mid)
 		}
 
 		var favourFolderInfos []models.FavourFoldersInfo
-		db.Where("mid IN (?)", maps.Keys(accountMap)).Find(&favourFolderInfos)
+		db.Where("mid IN (?)", accountMids).Find(&favourFolderInfos)
 		for _, v := range favourFolderInfos {
 			folders := FavourFolders{
 				Mlid:       v.Mlid,
