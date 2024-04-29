@@ -8,8 +8,40 @@
 ## 运行步骤
 - 复制项目下的`config.yaml.example`为`config.yaml`
 - 对应修改配置项
-- unix系统：`chmod +x bilibo`，执行`config=config1.yaml ./bilibo`运行程序
+- unix系统：`chmod +x bilibo`，执行`config=config.yaml ./bilibo`运行程序
 - 打开配置中的server.host&port，默认：`localhost:8080`
+
+## 配置文件
+```yaml
+server:                   # web服务配置
+  host: 0.0.0.0           # web监听地址
+  port: 8080              # web监听端口
+  db:                     # 数据库配置，支持sqlite和mysql
+    driver: sqlite
+    dsn: data.db
+    # driver: mysql
+    # dsn: user:pass@tcp(127.0.0.1:3306)/dbname?charset=utf8mb4&parseTime=True&loc=Local
+
+download:                 # 下载配置，目前设置下载路径
+  path: /data/downloads
+```
+
+## Docker Compose 文件示例
+该项目为`Linux/amd64`提供了 Docker 版本镜像。
+
+以下是一个 Docker Compose 的编写示例：
+```yaml
+services:
+  bilibo:
+    image: boredtape/bilibo
+    volumes:
+      - ./data:/app/data
+      - ./downloads:/downloads
+    restart: always
+    container_name: bilibo
+    ports:
+      - 8080:8080
+````
 
 ## 预览图
 ![账号列表](./.assets/1.png)
@@ -27,6 +59,7 @@
 - [x] 预览视频
 - [x] 同步详情
 - [x] 提供docker分发方式
+  - [  ] 提供除X86以外的镜像
 - [ ] 支持单一视频下载
 - [ ] 支持`我的收藏和订阅`
 
