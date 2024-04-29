@@ -96,7 +96,7 @@ func (r *refreshFavListJob) SetFav() *bili_client.AllFavourFolderInfo {
 	for _, mid := range r.bobo.ClientList() {
 		if client, err := r.bobo.GetClient(mid); err == nil {
 			if data, err := client.GetAllFavourFolderInfo(mid, 2, 0); err == nil {
-				services.SetFavourInfo(data)
+				services.SetFavourInfo(mid, data)
 				return data
 			} else {
 				logger.Warnf("client %d get fav list error: %v", mid, err)

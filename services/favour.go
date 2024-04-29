@@ -14,77 +14,89 @@ import (
 
 	"github.com/gabriel-vasile/mimetype"
 	"github.com/maruel/natural"
+	"golang.org/x/exp/maps"
 )
 
-func SetFavourInfo(favInfo *bili_client.AllFavourFolderInfo) {
+func SetFavourInfo(mid int, favInfo *bili_client.AllFavourFolderInfo) {
 	if favInfo == nil {
 		return
 	}
-	for _, fav := range favInfo.List {
-		f := models.FavourFoldersInfo{}
-		db := models.GetDB()
-		db.Where(models.FavourFoldersInfo{
-			Mid: fav.Mid, Fid: fav.Fid,
-		}).FirstOrInit(&f)
-		needUpdata := false
-		if f.ID == 0 {
-			f.Sync = consts.FAVOUR_NOT_SYNC
-			needUpdata = true
-		}
-		if f.Mid != fav.Mid {
-			f.Mid = fav.Mid
-			needUpdata = true
-		}
-		if f.Fid != fav.Fid {
-			f.Fid = fav.Fid
-			needUpdata = true
-		}
+	db := models.GetDB()
+	var existFavourInfos []models.FavourFoldersInfo
+	db.Model(&models.FavourFoldersInfo{}).Where("mid = ?", mid).Find(&existFavourInfos)
+	existMap := make(map[int]models.FavourFoldersInfo)
+	for _, v := range existFavourInfos {
+		existMap[v.Mlid] = v
+	}
+	existMlids := maps.Keys(existMap)
 
-		if f.Mlid != fav.Id {
-			f.Mlid = fav.Id
-			needUpdata = true
-		}
+	insertList := make([]*models.FavourFoldersInfo, 0)
+	updateList := make([]*models.FavourFoldersInfo, 0)
+	deleteMlids := make([]int, 0)
 
-		if f.Attr != fav.Attr {
-			f.Attr = fav.Attr
-			needUpdata = true
+	for _, v := range favInfo.List {
+		if !slices.Contains(existMlids, v.Id) {
+			insertList = append(insertList, &models.FavourFoldersInfo{
+				Mid:        mid,
+				Fid:        v.Fid,
+				MediaCount: v.MediaCount,
+				Attr:       v.Attr,
+				Title:      v.Title,
+				Mlid:       v.Id,
+				FavState:   v.FavState,
+				Sync:       consts.FAVOUR_NOT_SYNC,
+			})
+		} else if slices.Contains(existMlids, v.Id) {
+			existInfo := existMap[v.Id]
+			if existInfo.Attr != v.Attr || existInfo.Title != v.Title || existInfo.FavState != v.FavState || existInfo.MediaCount != v.MediaCount {
+				updateList = append(updateList, &models.FavourFoldersInfo{
+					MediaCount: v.MediaCount,
+					Attr:       v.Attr,
+					Title:      v.Title,
+					FavState:   v.FavState,
+				})
+			}
+		} else {
+			deleteMlids = append(deleteMlids, v.Id)
 		}
+	}
 
-		if f.FavState != fav.FavState {
-			f.FavState = fav.FavState
-			needUpdata = true
-		}
+	if len(insertList) > 0 {
+		db.Create(insertList)
+	}
 
-		if f.MediaCount != fav.MediaCount {
-			f.MediaCount = fav.MediaCount
-			needUpdata = true
-		}
+	if len(deleteMlids) > 0 {
+		db.Model(&models.FavourFoldersInfo{}).Where("mlid IN (?)", deleteMlids).Delete(&models.FavourFoldersInfo{})
+	}
 
-		if f.ID > 0 && f.Title != fav.Title && f.Sync == consts.FAVOUR_NEED_SYNC {
-			conf := config.GetConfig()
-			oldPath := filepath.Join(
-				conf.Download.Path,
-				strconv.Itoa(f.Mid), strings.ReplaceAll(f.Title, "/", "⁄"))
-			newPath := filepath.Join(
-				conf.Download.Path,
-				strconv.Itoa(f.Mid), strings.ReplaceAll(fav.Title, "/", "⁄"))
-			if _, err := os.Stat(oldPath); os.IsExist(err) {
-				os.MkdirAll(newPath, os.ModePerm)
-				if f, err := os.ReadDir(oldPath); err == nil {
-					for _, v := range f {
-						os.Rename(filepath.Join(oldPath, v.Name()), filepath.Join(newPath, v.Name()))
+	if len(updateList) > 0 {
+		conf := config.GetConfig()
+		for _, updateData := range updateList {
+			existInfo := existMap[updateData.Mlid]
+			oldTitle := strings.ReplaceAll(existInfo.Title, "/", "⁄")
+			newTitle := strings.ReplaceAll(updateData.Title, "/", "⁄")
+			if newTitle != oldTitle {
+				oldPath := filepath.Join(
+					conf.Download.Path,
+					strconv.Itoa(existInfo.Mid),
+					oldTitle,
+				)
+				newPath := filepath.Join(
+					conf.Download.Path,
+					strconv.Itoa(updateData.Mid),
+					newTitle,
+				)
+				if _, err := os.Stat(oldPath); os.IsExist(err) {
+					os.MkdirAll(newPath, os.ModePerm)
+					if f, err := os.ReadDir(oldPath); err == nil {
+						for _, v := range f {
+							os.Rename(filepath.Join(oldPath, v.Name()), filepath.Join(newPath, v.Name()))
+						}
+						os.Remove(oldPath)
 					}
-					os.Remove(oldPath)
 				}
 			}
-		}
-
-		if f.Title != fav.Title {
-			f.Title = fav.Title
-			needUpdata = true
-		}
-		if needUpdata {
-			db.Save(&f)
+			db.Model(&models.FavourFoldersInfo{}).Where("id = ?", existInfo.ID).Updates(updateData)
 		}
 	}
 }
