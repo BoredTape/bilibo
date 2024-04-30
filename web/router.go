@@ -1,7 +1,7 @@
-package main
+package web
 
 import (
-	"bilibo/views"
+	"bilibo/web/views"
 	"embed"
 
 	"github.com/gin-gonic/gin"

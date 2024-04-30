@@ -3,8 +3,8 @@
 appName="bilibo"
 
 FetchWeb() {
-  rm -rf dist
-  curl -L https://github.com/BoredTape/bilibo-web/releases/latest/download/dist.tar.gz -o dist.tar.gz
+  rm -rf ./web/dist
+  curl -L https://github.com/BoredTape/bilibo-web/releases/latest/download/dist.tar.gz -o ./web/dist.tar.gz
   tar -zxvf dist.tar.gz
   rm -rf dist.tar.gz
 }

@@ -28,7 +28,6 @@ func InitDB(driver, dsn string) {
 
 	db.AutoMigrate(
 		&BiliAccounts{},
-		&Tasks{},
 		&FavourFoldersInfo{},
 		&FavourVideos{},
 		&QRCode{},

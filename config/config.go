@@ -52,3 +52,7 @@ func InitConfig() {
 func GetConfig() *Config {
 	return c
 }
+
+func SetConfig(conf *Config) {
+	c = conf
+}

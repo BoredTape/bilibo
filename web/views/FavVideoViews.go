@@ -1,7 +1,7 @@
 package views
 
 import (
-	"bilibo/services"
+	"bilibo/web/services"
 	"net/http"
 	"strconv"
 

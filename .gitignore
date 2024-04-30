@@ -1,5 +1,6 @@
 .vscode/*
 config.yaml
 data.db
-dist/*
+web/dist/*
 build/*
+bilibo

@@ -8,12 +8,10 @@ import (
 	"bilibo/models"
 	"bilibo/scheduler"
 	"bilibo/services"
+	"bilibo/web"
 	"context"
-	"fmt"
 	"os"
 	"path/filepath"
-
-	"github.com/gin-gonic/gin"
 )
 
 func init() {
@@ -26,7 +24,6 @@ func init() {
 }
 
 func main() {
-	logger := log.GetLogger()
 	conf := config.GetConfig()
 	os.RemoveAll(filepath.Join(conf.Download.Path, ".tmp"))
 	os.MkdirAll(filepath.Join(conf.Download.Path, ".tmp"), os.ModePerm)
@@ -40,15 +37,5 @@ func main() {
 		go download.AccountDownload(clientId, ctx)
 		bobo.ClientSetCancal(clientId, cancel)
 	}
-	gin.SetMode(gin.ReleaseMode)
-	r := gin.Default()
-	Route(r)
-
-	for _, route := range r.Routes() {
-		logger.Infof("%s [%s]", route.Path, route.Method)
-	}
-	logger.Infof("web server running on %s:%d", conf.Server.Host, conf.Server.Port)
-	if err := r.Run(fmt.Sprintf("%s:%d", conf.Server.Host, conf.Server.Port)); err != nil {
-		panic(err)
-	}
+	web.Run()
 }

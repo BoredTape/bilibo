@@ -40,3 +40,16 @@ const (
 	VIDEO_MESSAGE_ERROR   = 999
 	VIDEO_MESSAGE_SUCCESS = 0
 )
+
+const (
+	ACCOUNT_DIR_FAVOUR  = "收藏夹"
+	ACCOUNT_DIR_RECYCLE = "回收站"
+	// ACCOUNT_DIR_WATCH_LATER = "稍后再看"
+)
+
+func GET_ACCOUNT_DIR() []string {
+	return []string{
+		ACCOUNT_DIR_FAVOUR,
+		ACCOUNT_DIR_RECYCLE,
+	}
+}

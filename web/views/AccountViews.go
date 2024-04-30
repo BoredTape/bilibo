@@ -6,8 +6,7 @@ import (
 	"bilibo/consts"
 	"bilibo/download"
 	"bilibo/log"
-	"bilibo/scheduler"
-	"bilibo/services"
+	"bilibo/web/services"
 	"context"
 	"fmt"
 	"net/http"
@@ -80,10 +79,6 @@ func accountDelete(c *gin.Context) {
 	services.DelAccount(req.Mid)
 	services.DelFavourInfoByMid(req.Mid)
 	services.DelFavourVideoByMid(req.Mid)
-	jobIds := services.DelTaskByMid(req.Mid)
-	for _, jobId := range jobIds {
-		scheduler.DelJob(jobId)
-	}
 	c.JSON(http.StatusOK, gin.H{
 		"message": "account delete",
 		"result":  0,

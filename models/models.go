@@ -21,17 +21,6 @@ func (ba *BiliAccounts) TableName() string {
 	return "bili_accounts"
 }
 
-type Tasks struct {
-	gorm.Model
-	Mid   int
-	JobId int
-	Type  int
-}
-
-func (t *Tasks) TableName() string {
-	return "tasks"
-}
-
 type FavourFoldersInfo struct {
 	gorm.Model
 	Mlid       int    // 收藏夹mlid（完整id），收藏夹原始id+创建者mid尾号2位
