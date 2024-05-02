@@ -1,4 +1,4 @@
-package bili_client
+package client
 
 import (
 	"encoding/json"

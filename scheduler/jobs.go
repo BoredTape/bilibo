@@ -1,15 +1,15 @@
 package scheduler
 
 import (
-	"bilibo/bili"
-	"bilibo/bili/bili_client"
+	"bilibo/bobo"
+	"bilibo/bobo/client"
 	"bilibo/consts"
 	"bilibo/log"
 	"bilibo/services"
 )
 
 type refreshWbiKeyJob struct {
-	bobo *bili.BoBo
+	bobo *bobo.BoBo
 }
 
 func (r *refreshWbiKeyJob) Run() {
@@ -48,7 +48,7 @@ func (r *refreshWbiKeyJob) Run() {
 }
 
 type refreshFavListJob struct {
-	bobo *bili.BoBo
+	bobo *bobo.BoBo
 }
 
 func (r *refreshFavListJob) Run() {
@@ -91,12 +91,28 @@ func (r *refreshFavListJob) Run() {
 	}
 }
 
-func (r *refreshFavListJob) SetFav() *bili_client.AllFavourFolderInfo {
+func (r *refreshFavListJob) SetFav() *client.AllFavourFolderInfo {
 	logger := log.GetLogger()
 	for _, mid := range r.bobo.ClientList() {
 		if client, err := r.bobo.GetClient(mid); err == nil {
 			if data, err := client.GetAllFavourFolderInfo(mid, 2, 0); err == nil {
-				services.SetFavourInfo(mid, data)
+				folderInfo := make([]services.FolderInfo, 0)
+				for _, v := range data.List {
+					folderInfo = append(folderInfo, services.FolderInfo{
+						Id:         v.Id,
+						Fid:        v.Fid,
+						Mid:        v.Mid,
+						Attr:       v.Attr,
+						Title:      v.Title,
+						FavState:   v.FavState,
+						MediaCount: v.MediaCount,
+					})
+				}
+				serviceData := services.FavourFolderInfo{
+					Count: data.Count,
+					List:  folderInfo,
+				}
+				services.SetFavourInfo(mid, &serviceData)
 				return data
 			} else {
 				logger.Warnf("client %d get fav list error: %v", mid, err)

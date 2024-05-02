@@ -3,6 +3,7 @@ package services
 import (
 	"bilibo/consts"
 	"bilibo/models"
+	"bilibo/universal"
 	"fmt"
 	"net/url"
 
@@ -24,7 +25,21 @@ func SaveAccountInfo(mid int, uname, face, cookies, imgKey, subKey string) {
 
 func DelAccount(mid int) {
 	db := models.GetDB()
-	db.Where(models.BiliAccounts{Mid: mid}).Delete(&models.BiliAccounts{})
+	account := models.BiliAccounts{}
+	db.Model(&models.BiliAccounts{}).Where("mid = ?", mid).Find(&account)
+	if account.ID < 1 {
+		return
+	}
+	*universal.GetCH() <- universal.CH{
+		Mid:     account.Mid,
+		UName:   account.UName,
+		Face:    account.Face,
+		ImgKey:  account.ImgKey,
+		SubKey:  account.SubKey,
+		Cookies: account.Cookies,
+		Action:  consts.CHANNEL_ACTION_ADD_CLIENT,
+	}
+	db.Delete(&account)
 }
 
 func AddQRCodeInfo(qrId string) {

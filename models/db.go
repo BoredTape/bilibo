@@ -9,7 +9,7 @@ import (
 
 var db *gorm.DB
 
-func InitDB(driver, dsn string) {
+func Init(driver, dsn string) {
 	var err error
 	gConfig := gorm.Config{Logger: logger.Default.LogMode(logger.Info)}
 	if driver == "mysql" {

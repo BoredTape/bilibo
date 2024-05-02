@@ -1,4 +1,4 @@
-package bili_client
+package client
 
 type LevelInfo struct {
 	CurrentLevel int         `json:"current_level"`

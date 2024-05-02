@@ -1,20 +1,14 @@
 package views
 
 import (
-	"bilibo/bili"
 	"bilibo/config"
-	"bilibo/consts"
-	"bilibo/download"
-	"bilibo/log"
 	"bilibo/web/services"
-	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
-	"os"
 	"path/filepath"
 	"strconv"
-	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -74,11 +68,9 @@ type accountDeleteReq struct {
 func accountDelete(c *gin.Context) {
 	var req accountDeleteReq
 	c.BindJSON(&req)
-	bilibo := bili.GetBilibo()
-	bilibo.DelClient(req.Mid)
-	services.DelAccount(req.Mid)
 	services.DelFavourInfoByMid(req.Mid)
 	services.DelFavourVideoByMid(req.Mid)
+	services.DelAccount(req.Mid)
 	c.JSON(http.StatusOK, gin.H{
 		"message": "account delete",
 		"result":  0,
@@ -92,54 +84,14 @@ func accountSave(c *gin.Context) {
 		"message": "获取登陆二维码失败",
 		"result":  999,
 	}
-	client := bili.NewClient("", 0)
 
-	if qr, err := client.GetQRCode(); err == nil {
-		if qrImgByte, err := qr.Encode(); err == nil {
-			conf := config.GetConfig()
-			qrId := time.Now().UnixNano()
-			fileName := fmt.Sprintf("%d.png", qrId)
-			filePath := filepath.Join(conf.Download.Path, ".tmp", fileName)
-			if err := os.WriteFile(filePath, qrImgByte, os.ModePerm); err == nil {
-				data["url"] = "/api/account/qrcode/" + fileName
-				data["id"] = fmt.Sprintf("%d", qrId)
-				rsp["data"] = data
-				rsp["message"] = "获取登陆二维码成功"
-				rsp["result"] = 0
-				services.AddQRCodeInfo(fmt.Sprintf("%d", qrId))
-				go func() {
-					logger := log.GetLogger()
-					if err := client.LoginWithQRCode(qr); err == nil {
-						biliBo := bili.GetBilibo()
-						biliBo.AddClient(client)
-						nav, _, err := client.GetNavigation()
-						if err != nil {
-							logger.Error(err)
-							return
-						}
-						if err := client.RefreshWbiKey(nav); err != nil {
-							logger.Error(err)
-							return
-						}
-						imgKey, subKey := client.GetWbiRunningTime()
-						services.SaveAccountInfo(
-							client.GetMid(),
-							nav.Uname, nav.Face,
-							client.GetCookiesString(),
-							imgKey, subKey,
-						)
-						ctx, cancel := context.WithCancel(context.Background())
-						biliBo.ClientSetCancal(client.GetMid(), cancel)
-						go download.AccountDownload(client.GetMid(), ctx)
-						services.SetQRCodeStatus(fmt.Sprintf("%d", qrId), consts.QRCODE_STATUS_SCANNED)
-					} else {
-						logger.Error(err)
-						services.SetQRCodeStatus(fmt.Sprintf("%d", qrId), consts.QRCODE_STATUS_INVALID)
-					}
-					os.Remove(filePath)
-				}()
-			}
-		}
+	url, qrId, err := services.SetAccountInfo()
+	if err != nil {
+		data["url"] = url
+		data["id"] = fmt.Sprintf("%d", qrId)
+		rsp["data"] = data
+		rsp["message"] = "获取登陆二维码成功"
+		rsp["result"] = 0
 	}
 
 	c.JSON(http.StatusOK, rsp)
@@ -176,28 +128,30 @@ func accountQrCodeStatus(c *gin.Context) {
 }
 
 func accountProxy(c *gin.Context) {
-	mid, err := strconv.Atoi(c.Param("mid"))
-	if err != nil {
-		c.JSON(500, gin.H{"message": err.Error()})
-		return
-	}
+	// mid, err := strconv.Atoi(c.Param("mid"))
+	// if err != nil {
+	// 	c.JSON(500, gin.H{"message": err.Error()})
+	// 	return
+	// }
 	faceUrlEncode := c.Query("url")
 	faceUrlDecode, err := url.QueryUnescape(faceUrlEncode)
 	if err != nil {
 		c.JSON(500, gin.H{"message": err.Error()})
 		return
 	}
-	bilibo := bili.GetBilibo()
-	client, err := bilibo.GetClient(mid)
+
+	resp, err := http.Get(faceUrlDecode)
+
 	if err != nil {
 		c.JSON(500, gin.H{"message": err.Error()})
 		return
 	}
-	resty := client.GetResty()
-	resp, err := resty.R().Get(faceUrlDecode)
+
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		c.JSON(500, gin.H{"message": err.Error()})
 		return
 	}
-	c.Writer.Write(resp.Body())
+	c.Writer.Write(body)
 }

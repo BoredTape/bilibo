@@ -1,7 +1,7 @@
 package scheduler
 
 import (
-	"bilibo/bili"
+	"bilibo/bobo"
 
 	"github.com/robfig/cron/v3"
 )
@@ -16,7 +16,7 @@ func init() {
 	sched = cron.New()
 }
 
-func BiliBoSched(bobo *bili.BoBo) {
+func BiliBoSched(bobo *bobo.BoBo) {
 	refreshWbiKey := refreshWbiKeyJob{bobo}
 	refreshWbiKey.Run()
 	sched.AddJob("*/15 * * * *", &refreshWbiKey)

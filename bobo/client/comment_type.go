@@ -1,5 +1,5 @@
 // copy from https://github.com/CuteReimu/bilibili/blob/master/comment.go
-package bili_client
+package client
 
 type Comment struct { // 评论条目对象
 	Rpid      int64    `json:"rpid"`      // 评论 rpid

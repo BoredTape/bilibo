@@ -67,7 +67,7 @@ func DeleteFavours(mlids []int) {
 			}
 			break
 		} else {
-			logger.Info(fmt.Sprintf("收藏夹视频正在下载,重试中..."))
+			logger.Info("收藏夹视频正在下载,重试中...")
 		}
 		time.Sleep(2 * time.Second)
 	}

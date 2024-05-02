@@ -1,6 +1,6 @@
 //copy from https://github.com/CuteReimu/bilibili/blob/master/fav.go
 
-package bili_client
+package client
 
 import (
 	"encoding/json"

@@ -25,7 +25,7 @@ func InitConfig() {
 
 func Init() {
 	InitConfig()
-	log.InitLogger()
+	log.Init()
 	conf := config.GetConfig()
-	models.InitDB(conf.Server.DB.Driver, conf.Server.DB.DSN)
+	models.Init(conf.Server.DB.Driver, conf.Server.DB.DSN)
 }

@@ -1,5 +1,5 @@
 // copy from https://github.com/CuteReimu/bilibili/blob/master/client.go
-package bili_client
+package client
 
 import (
 	"crypto/rand"

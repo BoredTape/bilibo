@@ -1,5 +1,5 @@
 // copy from https://github.com/CuteReimu/bilibili/blob/master/fav.go
-package bili_client
+package client
 
 type FavourFolderInfo struct {
 	Id    int      `json:"id"`    // 收藏夹mlid（完整id），收藏夹原始id+创建者mid尾号2位

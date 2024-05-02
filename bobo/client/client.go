@@ -1,5 +1,5 @@
 // copy from https://github.com/CuteReimu/bilibili/blob/master/client.go
-package bili_client
+package client
 
 import (
 	"net/http"
@@ -66,7 +66,7 @@ func WithCookiesStrings(cookies string) ClientOption {
 	}
 }
 
-func NewClient(opts ...ClientOption) *Client {
+func New(opts ...ClientOption) *Client {
 	c := &Client{}
 	for _, opt := range opts {
 		opt(c)

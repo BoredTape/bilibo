@@ -1,5 +1,5 @@
 // copy from https://github.com/CuteReimu/bilibili/blob/master/type.go
-package bili_client
+package client
 
 import (
 	"strconv"

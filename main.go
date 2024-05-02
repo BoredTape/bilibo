@@ -1,26 +1,26 @@
 package main
 
 import (
-	"bilibo/bili"
+	"bilibo/bobo"
 	"bilibo/config"
-	"bilibo/download"
 	"bilibo/log"
 	"bilibo/models"
 	"bilibo/scheduler"
 	"bilibo/services"
+	"bilibo/universal"
 	"bilibo/web"
-	"context"
 	"os"
 	"path/filepath"
 )
 
 func init() {
-	config.InitConfig()
+	config.Init()
+	universal.Init()
+	log.Init()
 	conf := config.GetConfig()
-	log.InitLogger()
-	models.InitDB(conf.Server.DB.Driver, conf.Server.DB.DSN)
-	bili.InitBiliBo()
+	models.Init(conf.Server.DB.Driver, conf.Server.DB.DSN)
 	services.InitSetVideoStatus()
+	bobo.Init()
 }
 
 func main() {
@@ -28,14 +28,8 @@ func main() {
 	os.RemoveAll(filepath.Join(conf.Download.Path, ".tmp"))
 	os.MkdirAll(filepath.Join(conf.Download.Path, ".tmp"), os.ModePerm)
 
-	bobo := bili.GetBilibo()
-	scheduler.BiliBoSched(bobo)
+	scheduler.BiliBoSched(bobo.GetBoBo())
 	scheduler.Start()
 
-	for _, clientId := range bobo.ClientList() {
-		ctx, cancel := context.WithCancel(context.Background())
-		go download.AccountDownload(clientId, ctx)
-		bobo.ClientSetCancal(clientId, cancel)
-	}
 	web.Run()
 }

@@ -1,4 +1,4 @@
-package bili_client
+package client
 
 type SpaceMyInfo struct {
 	Mid            int    `json:"mid"`

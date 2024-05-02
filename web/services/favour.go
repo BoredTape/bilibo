@@ -3,6 +3,7 @@ package services
 import (
 	"bilibo/config"
 	"bilibo/consts"
+	"bilibo/log"
 	"bilibo/models"
 	"os"
 	"path/filepath"
@@ -68,6 +69,9 @@ func GetFavourIndex(mid, action, path string) map[string]interface{} {
 	subPath := filepath.Join(rootPath, strings.ReplaceAll(path, mid+"://", "/"))
 	fileMap := make(map[string]*FavFile)
 	fileNames := make([]string, 0)
+	logger := log.GetLogger()
+	logger.Info(subPath)
+	logger.Info("fuck")
 	dirFiles, err := os.ReadDir(subPath)
 	if err != nil {
 		return result

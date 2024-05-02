@@ -1,7 +1,6 @@
 package services
 
 import (
-	"bilibo/bili/bili_client"
 	"bilibo/config"
 	"bilibo/consts"
 	"bilibo/models"
@@ -15,7 +14,21 @@ import (
 	"golang.org/x/exp/maps"
 )
 
-func SetFavourInfo(mid int, favInfo *bili_client.AllFavourFolderInfo) {
+type FolderInfo struct {
+	Id         int
+	Fid        int
+	Mid        int
+	Attr       int
+	Title      string
+	FavState   int
+	MediaCount int
+}
+type FavourFolderInfo struct {
+	Count int
+	List  []FolderInfo
+}
+
+func SetFavourInfo(mid int, favInfo *FavourFolderInfo) {
 	if favInfo == nil {
 		return
 	}
@@ -48,6 +61,7 @@ func SetFavourInfo(mid int, favInfo *bili_client.AllFavourFolderInfo) {
 			existInfo := existMap[v.Id]
 			if existInfo.Attr != v.Attr || existInfo.Title != v.Title || existInfo.FavState != v.FavState || existInfo.MediaCount != v.MediaCount {
 				updateList = append(updateList, &models.FavourFoldersInfo{
+					Mlid:       v.Id,
 					MediaCount: v.MediaCount,
 					Attr:       v.Attr,
 					Title:      v.Title,
@@ -60,7 +74,9 @@ func SetFavourInfo(mid int, favInfo *bili_client.AllFavourFolderInfo) {
 	}
 
 	if len(insertList) > 0 {
-		db.Create(insertList)
+		for _, insert_data := range insertList {
+			db.Model(&models.FavourFoldersInfo{}).Create(insert_data)
+		}
 	}
 
 	if len(deleteMlids) > 0 {
