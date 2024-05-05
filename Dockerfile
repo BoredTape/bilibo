@@ -5,10 +5,10 @@ RUN apt update && apt -y --no-install-recommends install musl-tools bash curl
 COPY go.mod go.sum ./
 RUN go mod download
 COPY ./ ./
-RUN rm -rf dist && \
+RUN cd web && rm -rf dist && \
     curl -L https://github.com/BoredTape/bilibo-web/releases/latest/download/dist.tar.gz -o dist.tar.gz && \
     tar -zxvf dist.tar.gz && \
-    rm -rf dist.tar.gz && \
+    rm -rf dist.tar.gz && cd .. && \
     CC=musl-gcc CGO_ENABLED=1 go build -ldflags '-s -w --extldflags "-static -fpic"' -o ./bin/bilibo -tags=jsoniter .
 
 FROM alpine:latest

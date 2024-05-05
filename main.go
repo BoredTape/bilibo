@@ -1,54 +1,33 @@
 package main
 
 import (
-	"bilibo/bili"
+	"bilibo/bobo"
 	"bilibo/config"
-	"bilibo/download"
 	"bilibo/log"
 	"bilibo/models"
 	"bilibo/scheduler"
-	"bilibo/services"
-	"context"
-	"fmt"
+	"bilibo/universal"
+	"bilibo/web"
 	"os"
 	"path/filepath"
-
-	"github.com/gin-gonic/gin"
 )
 
 func init() {
-	config.InitConfig()
+	config.Init()
+	universal.Init()
+	log.Init()
 	conf := config.GetConfig()
-	log.InitLogger()
-	models.InitDB(conf.Server.DB.Driver, conf.Server.DB.DSN)
-	bili.InitBiliBo()
-	services.InitSetVideoStatus()
+	models.Init(conf.Server.DB.Driver, conf.Server.DB.DSN)
+	bobo.Init()
 }
 
 func main() {
-	logger := log.GetLogger()
 	conf := config.GetConfig()
 	os.RemoveAll(filepath.Join(conf.Download.Path, ".tmp"))
 	os.MkdirAll(filepath.Join(conf.Download.Path, ".tmp"), os.ModePerm)
 
-	bobo := bili.GetBilibo()
-	scheduler.BiliBoSched(bobo)
+	scheduler.BiliBoSched(bobo.GetBoBo())
 	scheduler.Start()
 
-	for _, clientId := range bobo.ClientList() {
-		ctx, cancel := context.WithCancel(context.Background())
-		go download.AccountDownload(clientId, ctx)
-		bobo.ClientSetCancal(clientId, cancel)
-	}
-	gin.SetMode(gin.ReleaseMode)
-	r := gin.Default()
-	Route(r)
-
-	for _, route := range r.Routes() {
-		logger.Infof("%s [%s]", route.Path, route.Method)
-	}
-	logger.Infof("web server running on %s:%d", conf.Server.Host, conf.Server.Port)
-	if err := r.Run(fmt.Sprintf("%s:%d", conf.Server.Host, conf.Server.Port)); err != nil {
-		panic(err)
-	}
+	web.Run()
 }

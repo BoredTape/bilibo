@@ -1,7 +1,7 @@
 package scheduler
 
 import (
-	"bilibo/bili"
+	"bilibo/bobo"
 
 	"github.com/robfig/cron/v3"
 )
@@ -16,18 +16,24 @@ func init() {
 	sched = cron.New()
 }
 
-func BiliBoSched(bobo *bili.BoBo) {
-	refreshWbiKey := refreshWbiKeyJob{bobo}
+func BiliBoSched(bobo *bobo.BoBo) {
+	refreshWbiKey := refreshWbiKeyJob{"RefreshWbiKey", bobo}
 	refreshWbiKey.Run()
 	sched.AddJob("*/15 * * * *", &refreshWbiKey)
 
-	refreshFavList := refreshFavListJob{bobo}
-	refreshFavList.SetFav()
+	refreshFavList := refreshFavListJob{"RefreshFavListJob", bobo}
 	sched.AddJob("*/15 * * * *", &refreshFavList)
+
+	refreshToView := refreshToViewJob{"RefreshToViewJob", bobo}
+	sched.AddJob("*/15 * * * *", &refreshToView)
 }
 
 func Start() {
 	sched.Start()
+	t := InitTaskInfo("RefreshFavListJob", "更新收藏夹信息")
+	t.UpdateNextRunningAt(15 * 60)
+	t = InitTaskInfo("RefreshToViewJob", "更新稍后再看视频")
+	t.UpdateNextRunningAt(15 * 60)
 }
 
 func DelJob(jobId int) {
