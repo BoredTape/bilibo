@@ -55,7 +55,7 @@ func setup() {
 	db.Save(&fav)
 
 	video1 := models.Videos{
-		Mlid:           1,
+		SourceId:       1,
 		Mid:            1,
 		Bvid:           "abc1",
 		Cid:            1,
@@ -67,11 +67,12 @@ func setup() {
 		Rotate:         1,
 		Status:         consts.VIDEO_STATUS_DOWNLOADING,
 		LastDownloadAt: nil,
+		Type:           consts.VIDEO_TYPE_FAVOUR,
 	}
 	db.Save(&video1)
 
 	video2 := models.Videos{
-		Mlid:           1,
+		SourceId:       1,
 		Mid:            1,
 		Bvid:           "abc2",
 		Cid:            1,
@@ -83,11 +84,12 @@ func setup() {
 		Rotate:         1,
 		Status:         consts.VIDEO_STATUS_DOWNLOAD_FAIL,
 		LastDownloadAt: nil,
+		Type:           consts.VIDEO_TYPE_FAVOUR,
 	}
 	db.Save(&video2)
 
 	video3 := models.Videos{
-		Mlid:           1,
+		SourceId:       1,
 		Mid:            1,
 		Bvid:           "abc3",
 		Cid:            1,
@@ -99,11 +101,12 @@ func setup() {
 		Rotate:         1,
 		Status:         consts.VIDEO_STATUS_DOWNLOAD_RETRY,
 		LastDownloadAt: nil,
+		Type:           consts.VIDEO_TYPE_FAVOUR,
 	}
 	db.Save(&video3)
 
 	video4 := models.Videos{
-		Mlid:           1,
+		SourceId:       1,
 		Mid:            1,
 		Bvid:           "abc4",
 		Cid:            1,
@@ -115,6 +118,7 @@ func setup() {
 		Rotate:         1,
 		Status:         consts.VIDEO_STATUS_TO_BE_DOWNLOAD,
 		LastDownloadAt: nil,
+		Type:           consts.VIDEO_TYPE_FAVOUR,
 	}
 	db.Save(&video4)
 }
@@ -155,9 +159,10 @@ func ChangeFavourName(t *testing.T) {
 	db.Model(&models.Videos{}).Where(
 		"status < 100",
 	).Count(&downloadingCount2)
+
 	if downloadingCount2 != 1 {
 		t.Log(downloadingCount2)
-		t.Fatal("downloadingCount != 0")
+		t.Fatal("downloadingCount != 1")
 	}
 	time.Sleep(2 * time.Second)
 	db.Model(&models.Videos{}).Where(

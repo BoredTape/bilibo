@@ -84,7 +84,7 @@ func (b *BoBo) RefreshFavVideo(mid int, data *client.AllFavourFolderInfo) {
 			fv_svc.SetMid(mid)
 			for _, fav := range data.List {
 				mlid := fav.Id
-				fv_svc.V.Mlid = mlid
+				fv_svc.V.SourceId = mlid
 				if fret, err := client.GetFavourList(mlid, 0, "", "", 0, 20, 1, "web"); err == nil {
 					for _, media := range fret.Medias {
 						bvid := media.BvId
@@ -121,7 +121,7 @@ func (b *BoBo) RefreshToView(mid int) {
 			for _, data := range toViewData.List {
 				bvid := data.Bvid
 				fv_svc.V.Bvid = bvid
-				fv_svc.V.Mlid = 0
+				fv_svc.V.SourceId = 0
 				if vret, err := client.GetVideoInfoByBvid(bvid); err == nil {
 					for _, page := range vret.Pages {
 						cid := page.Cid
@@ -166,7 +166,7 @@ func addClient(ch *universal.CH) {
 	ctx, cancel := context.WithCancel(context.Background())
 	bobo.clientCancelFunc[ch.Mid] = cancel
 	go bobo.RefreshAll(ch.Mid)
-	go downloadFavVideo(c, ctx)
+	go downloadVideo(c, ctx)
 }
 
 func (b *BoBo) RefreshAll(mid int) {
