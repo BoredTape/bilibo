@@ -1,91 +1,187 @@
 package services
 
 import (
-	"bilibo/bili/bili_client"
 	"bilibo/config"
 	"bilibo/consts"
+	"bilibo/log"
 	"bilibo/models"
-	"os"
+	"bilibo/utils"
+	"fmt"
 	"path/filepath"
 	"slices"
-	"sort"
-	"strconv"
 	"strings"
+	"time"
 
-	"github.com/gabriel-vasile/mimetype"
-	"github.com/maruel/natural"
+	"golang.org/x/exp/maps"
 )
 
-func SetFavourInfo(favInfo *bili_client.AllFavourFolderInfo) {
+type FolderInfo struct {
+	Id         int
+	Fid        int
+	Mid        int
+	Attr       int
+	Title      string
+	FavState   int
+	MediaCount int
+}
+type FavourFolderInfo struct {
+	Count int
+	List  []FolderInfo
+}
+
+func SetFavourInfo(mid int, favInfo *FavourFolderInfo) {
 	if favInfo == nil {
 		return
 	}
-	for _, fav := range favInfo.List {
-		f := models.FavourFoldersInfo{}
-		db := models.GetDB()
-		db.Where(models.FavourFoldersInfo{
-			Mid: fav.Mid, Fid: fav.Fid,
-		}).FirstOrInit(&f)
-		needUpdata := false
-		if f.ID == 0 {
-			f.Sync = consts.FAVOUR_NOT_SYNC
-			needUpdata = true
-		}
-		if f.Mid != fav.Mid {
-			f.Mid = fav.Mid
-			needUpdata = true
-		}
-		if f.Fid != fav.Fid {
-			f.Fid = fav.Fid
-			needUpdata = true
-		}
+	db := models.GetDB()
+	var existFavourInfos []models.FavourFoldersInfo
+	db.Model(&models.FavourFoldersInfo{}).Where("mid = ?", mid).Find(&existFavourInfos)
+	existMap := make(map[int]models.FavourFoldersInfo)
+	for _, v := range existFavourInfos {
+		existMap[v.Mlid] = v
+	}
+	existMlids := maps.Keys(existMap)
+	accountMlids := make([]int, 0)
 
-		if f.Mlid != fav.Id {
-			f.Mlid = fav.Id
-			needUpdata = true
-		}
+	insertList := make([]*models.FavourFoldersInfo, 0)
+	updateList := make([]*models.FavourFoldersInfo, 0)
+	deleteMlids := make([]int, 0)
 
-		if f.Attr != fav.Attr {
-			f.Attr = fav.Attr
-			needUpdata = true
-		}
-
-		if f.FavState != fav.FavState {
-			f.FavState = fav.FavState
-			needUpdata = true
-		}
-
-		if f.MediaCount != fav.MediaCount {
-			f.MediaCount = fav.MediaCount
-			needUpdata = true
-		}
-
-		if f.ID > 0 && f.Title != fav.Title && f.Sync == consts.FAVOUR_NEED_SYNC {
-			conf := config.GetConfig()
-			oldPath := filepath.Join(
-				conf.Download.Path,
-				strconv.Itoa(f.Mid), strings.ReplaceAll(f.Title, "/", "⁄"))
-			newPath := filepath.Join(
-				conf.Download.Path,
-				strconv.Itoa(f.Mid), strings.ReplaceAll(fav.Title, "/", "⁄"))
-			if _, err := os.Stat(oldPath); os.IsExist(err) {
-				os.MkdirAll(newPath, os.ModePerm)
-				if f, err := os.ReadDir(oldPath); err == nil {
-					for _, v := range f {
-						os.Rename(filepath.Join(oldPath, v.Name()), filepath.Join(newPath, v.Name()))
-					}
-					os.Remove(oldPath)
-				}
+	for _, v := range favInfo.List {
+		accountMlids = append(accountMlids, v.Id)
+		if !slices.Contains(existMlids, v.Id) {
+			insertList = append(insertList, &models.FavourFoldersInfo{
+				Mid:        mid,
+				Fid:        v.Fid,
+				MediaCount: v.MediaCount,
+				Attr:       v.Attr,
+				Title:      v.Title,
+				Mlid:       v.Id,
+				FavState:   v.FavState,
+				Sync:       consts.FAVOUR_NOT_SYNC,
+			})
+		} else if slices.Contains(existMlids, v.Id) {
+			existInfo := existMap[v.Id]
+			if existInfo.Attr != v.Attr || existInfo.Title != v.Title || existInfo.FavState != v.FavState || existInfo.MediaCount != v.MediaCount {
+				updateList = append(updateList, &models.FavourFoldersInfo{
+					Mlid:       v.Id,
+					MediaCount: v.MediaCount,
+					Attr:       v.Attr,
+					Title:      v.Title,
+					FavState:   v.FavState,
+				})
 			}
 		}
+	}
 
-		if f.Title != fav.Title {
-			f.Title = fav.Title
-			needUpdata = true
+	for _, v := range existMlids {
+		if !slices.Contains(accountMlids, v) {
+			deleteMlids = append(deleteMlids, v)
 		}
-		if needUpdata {
-			db.Save(&f)
+	}
+
+	if len(insertList) > 0 {
+		for _, insert_data := range insertList {
+			db.Model(&models.FavourFoldersInfo{}).Create(insert_data)
 		}
+	}
+
+	if len(deleteMlids) > 0 {
+		go DeleteFavours(deleteMlids)
+	}
+
+	if len(updateList) > 0 {
+		conf := config.GetConfig()
+		for _, updateData := range updateList {
+			existInfo := existMap[updateData.Mlid]
+			oldTitle := strings.ReplaceAll(existInfo.Title, "/", "⁄")
+			newTitle := strings.ReplaceAll(updateData.Title, "/", "⁄")
+			if newTitle != oldTitle {
+				favPath := utils.GetFavourPath(existInfo.Mid, conf.Download.Path)
+				oldPath := filepath.Join(favPath, oldTitle)
+				newPath := filepath.Join(favPath, newTitle)
+				go ChangeFavourName(updateData.Mlid, oldPath, newPath)
+			}
+			db.Model(&models.FavourFoldersInfo{}).Where("id = ?", existInfo.ID).Updates(updateData)
+		}
+	}
+}
+
+func ChangeFavourName(mlid int, oldPath, newPath string) {
+	db := models.GetDB()
+	logger := log.GetLogger()
+	sqlPause := "UPDATE favour_videos SET status=status+100 WHERE status IN (?) AND deleted_at IS NULL;"
+	value := []int{
+		consts.VIDEO_STATUS_TO_BE_DOWNLOAD,
+		consts.VIDEO_STATUS_DOWNLOAD_FAIL,
+		consts.VIDEO_STATUS_DOWNLOAD_RETRY,
+	}
+	db.Exec(sqlPause, value)
+	for {
+		t := NewTask(
+			WithTaskType(consts.TASK_TYPE_RUNNING_TIME),
+			WithName("更改收藏夹名字: "+oldPath+" => "+newPath),
+			WithTaskId(fmt.Sprintf("change_favour_name_%d", mlid)),
+		)
+		t.Save()
+		logger.Info(fmt.Sprintf("收藏夹路径更改:\n%s => %s", oldPath, newPath))
+		var downloadingCount int64
+		db.Model(&models.Videos{}).Where(
+			"mlid = ? AND status = ?", mlid, consts.VIDEO_STATUS_DOWNLOADING,
+		).Count(&downloadingCount)
+		fmt.Println(downloadingCount)
+		if downloadingCount == 0 {
+			fmt.Println(oldPath, "\n", newPath)
+			if err := utils.RenameDir(oldPath, newPath); err != nil {
+				logger.Error(err.Error())
+			}
+			sqlContinue := "UPDATE favour_videos SET status=status-100 WHERE status > 100 AND deleted_at IS NULL;"
+			db.Exec(sqlContinue)
+			break
+		} else {
+			logger.Info(fmt.Sprintf("收藏夹路径 %s 正在下载,重试中...", oldPath))
+		}
+		t.UpdateNextRunningAt(2)
+		time.Sleep(2 * time.Second)
+	}
+}
+
+func DeleteFavours(mlids []int) {
+	db := models.GetDB()
+	logger := log.GetLogger()
+	favInfos := []models.FavourFoldersInfo{}
+	db.Where("mlid IN (?)", mlids).Find(&favInfos)
+	conf := config.GetConfig()
+	basePath := conf.Download.Path
+	db.Where(
+		"mlid IN (?) AND status != ?", mlids, consts.VIDEO_STATUS_DOWNLOADING,
+	).Delete(&models.Videos{})
+	for {
+		mlidsStr := strings.Trim(strings.Replace(fmt.Sprint(mlids), " ", ",", -1), "[]")
+		fullMlidsStr := fmt.Sprintf("删除收藏夹,收藏夹IDs:[%s]", mlidsStr)
+		t := NewTask(
+			WithTaskType(consts.TASK_TYPE_RUNNING_TIME),
+			WithName(fullMlidsStr),
+			WithTaskId(fmt.Sprintf("delete_favours:%s", mlidsStr)),
+		)
+		t.Save()
+		logger.Info(fullMlidsStr)
+		var downloadingCount int64
+		db.Model(&models.Videos{}).Where(
+			"mlid IN (?) AND status = ?", mlids, consts.VIDEO_STATUS_DOWNLOADING,
+		).Count(&downloadingCount)
+		if downloadingCount == 0 {
+			db.Where("mlid IN (?)", mlids).Delete(&models.FavourFoldersInfo{})
+			db.Where("mlid IN (?)", mlids).Delete(&models.Videos{})
+			for _, fav := range favInfos {
+				utils.RecyclePath(fav.Mid, basePath, utils.Name(fav.Title))
+			}
+			break
+		} else {
+			logger.Info("收藏夹视频正在下载,重试中...")
+		}
+		t.UpdateNextRunningAt(2)
+		time.Sleep(2 * time.Second)
 	}
 }
 
@@ -97,157 +193,4 @@ func GetFavourInfoByMlid(mlid int) *models.FavourFoldersInfo {
 		return nil
 	}
 	return &favourFolderInfo
-}
-
-func DelFavourInfoByMid(mid int) {
-	db := models.GetDB()
-	db.Where(models.FavourFoldersInfo{Mid: mid}).Delete(&models.FavourFoldersInfo{})
-}
-
-type FavourFolders struct {
-	Mlid       int    `json:"mlid"`
-	Fid        int    `json:"fid"`
-	Title      string `json:"title"`
-	MediaCount int    `json:"media_count"`
-	Sync       int    `json:"sync"`
-}
-
-func GetAccountFavourInfoByMid(mid int) *[]*FavourFolders {
-	db := models.GetDB()
-	var favourFolderInfos []models.FavourFoldersInfo
-	db.Model(&models.FavourFoldersInfo{}).Where("mid = ?", mid).Find(&favourFolderInfos)
-	datas := make([]*FavourFolders, 0)
-	for _, v := range favourFolderInfos {
-		datas = append(datas, &FavourFolders{
-			Mlid:       v.Mlid,
-			Fid:        v.Fid,
-			Title:      v.Title,
-			MediaCount: v.MediaCount,
-			Sync:       v.Sync,
-		})
-	}
-	return &datas
-}
-
-func SetFavourSyncStatus(mid, mlid, status int) {
-	db := models.GetDB()
-	db.Model(&models.FavourFoldersInfo{}).Where("mlid = ?", mlid).Update("sync", status)
-	if status == consts.FAVOUR_NEED_SYNC {
-		db.Model(&models.FavourVideos{}).Where("mid = ? AND mlid = ? AND status = ?", mid, mlid, consts.VIDEO_STATUS_INIT).Update("status", consts.VIDEO_STATUS_TO_BE_DOWNLOAD)
-	}
-}
-
-type FavFile struct {
-	BaseName      string   `json:"basename"`
-	Extension     string   `json:"extension"`
-	ExtraMetadata []string `json:"extra_metadata"`
-	FileSize      int64    `json:"file_size"`
-	LastModified  int64    `json:"last_modified"`
-	MimeType      *string  `json:"mime_type"`
-	Path          string   `json:"path"`
-	Storage       string   `json:"storage"`
-	Type          string   `json:"type"`
-	Visibility    string   `json:"visibility"`
-}
-
-func GetFavourIndex(mid, action, path string) map[string]interface{} {
-	result := make(map[string]interface{})
-	conf := config.GetConfig()
-	rootPath := filepath.Join(conf.Download.Path, mid)
-
-	result["adapter"] = mid
-	result["dirname"] = path
-	result["storages"] = []string{mid}
-
-	subPath := filepath.Join(rootPath, strings.ReplaceAll(path, mid+"://", "/"))
-	fileMap := make(map[string]*FavFile)
-	fileNames := make([]string, 0)
-	dirFiles, err := os.ReadDir(subPath)
-	if err != nil {
-		return result
-	}
-
-	for _, file := range dirFiles {
-		if fileInfo, err := file.Info(); err == nil {
-			file := FavFile{
-				Path:          mid + ":/" + filepath.Join(strings.ReplaceAll(path, mid+"://", "/"), fileInfo.Name()),
-				Visibility:    "public",
-				ExtraMetadata: make([]string, 0),
-				FileSize:      fileInfo.Size(),
-				LastModified:  fileInfo.ModTime().Unix(),
-				Storage:       mid,
-				BaseName:      fileInfo.Name(),
-				MimeType:      nil,
-			}
-			if fileInfo.IsDir() {
-				file.Type = "dir"
-				file.Extension = ""
-			} else {
-				file.Type = "file"
-			}
-			fileNames = append(fileNames, fileInfo.Name())
-			fileMap[fileInfo.Name()] = &file
-		}
-	}
-
-	if len(fileNames) < 1 {
-		return result
-	}
-
-	sort.Sort(natural.StringSlice(fileNames))
-
-	files := make([]*FavFile, 0)
-
-	for _, fileName := range fileNames {
-		file := fileMap[fileName]
-		if file.Type == "file" {
-			mtype, err := mimetype.DetectFile(filepath.Join(subPath, file.BaseName))
-			if err != nil {
-				file.MimeType = nil
-				fextension := strings.Split(file.BaseName, ".")
-				slices.Reverse(fextension)
-				file.Extension = fextension[0]
-				continue
-			} else {
-				fmtype := mtype.String()
-				file.MimeType = &fmtype
-				file.Extension = strings.Replace(mtype.Extension(), ".", "", 1)
-			}
-		}
-		files = append(files, file)
-	}
-
-	result["files"] = files
-	return result
-}
-
-// func GetFavourFilePreview(mid, action, path string) (string, error) {
-// 	filePath, err := GetFavourFileDownload(mid, action, path)
-// 	if action == "download" {
-// 		return filePath, err
-// 	}
-// 	mtype, err := mimetype.DetectFile(filePath)
-// 	if err != nil {
-// 		return filePath, err
-// 	}
-// 	if strings.Contains(mtype.String(), "video") {
-// 		if _, err = os.Stat(filePath + ".png"); err == nil {
-// 			return filePath + ".png", nil
-// 		} else {
-// 			return "default_video_cover.png", nil
-// 		}
-// 	}
-// 	return filePath, err
-
-// }
-
-func GetFavourFileDownload(mid, action, path string) (string, error) {
-	conf := config.GetConfig()
-	rootPath := filepath.Join(conf.Download.Path, mid)
-	filePath := filepath.Join(rootPath, strings.ReplaceAll(path, mid+"://", "/"))
-	if _, err := os.Stat(filePath); err != nil {
-		return "", err
-	} else {
-		return filePath, nil
-	}
 }

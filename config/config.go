@@ -28,7 +28,7 @@ type Config struct {
 	Download DownloadConfig
 }
 
-func InitConfig() {
+func Init() {
 	configPath := os.Getenv("config")
 	if configPath == "" {
 		configPath = "config.yaml"
@@ -41,14 +41,15 @@ func InitConfig() {
 		panic(err)
 	}
 	if c.Download.Path == "" {
-		c.Download.Path = "./data/downloads"
-		if _, err := os.Create(c.Download.Path); err != nil {
-			panic(err)
-		}
+		panic("download path not set")
 	}
 
 }
 
 func GetConfig() *Config {
 	return c
+}
+
+func SetConfig(conf *Config) {
+	c = conf
 }

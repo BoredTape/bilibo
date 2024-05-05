@@ -10,7 +10,7 @@ func GetLogger() *zap.SugaredLogger {
 	return zap.S()
 }
 
-func InitLogger() {
+func Init() {
 	encoderConfig := zap.NewDevelopmentEncoderConfig()
 	encoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
 	logger := zap.New(zapcore.NewCore(

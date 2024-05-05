@@ -5,14 +5,19 @@ import "errors"
 var ERROR_DOWNLOAD_403 = errors.New("download failed,status code: 403")
 
 const (
+	WATCH_LATER_NOT_SYNC  = 0
+	WATCH_LATER_NEED_SYNC = 1
+)
+
+const (
 	FAVOUR_NOT_SYNC  = 0
 	FAVOUR_NEED_SYNC = 1
 )
 
 // 任务类型
 const (
-	TASK_TYPE_FAVOUR   = 1
-	TASK_TYPE_DOWNLOAD = 2
+	TASK_TYPE_SCHEDULER    = 1
+	TASK_TYPE_RUNNING_TIME = 2
 )
 
 const (
@@ -22,6 +27,11 @@ const (
 	VIDEO_STATUS_DOWNLOAD_DONE  = 2
 	VIDEO_STATUS_DOWNLOAD_FAIL  = 3
 	VIDEO_STATUS_DOWNLOAD_RETRY = 4
+)
+
+const (
+	VIDEO_TYPE_FAVOUR      = 1
+	VIDEO_TYPE_WATCH_LATER = 2
 )
 
 const (
@@ -40,3 +50,20 @@ const (
 	VIDEO_MESSAGE_ERROR   = 999
 	VIDEO_MESSAGE_SUCCESS = 0
 )
+
+const (
+	ACCOUNT_DIR_FAVOUR      = "收藏夹"
+	ACCOUNT_DIR_RECYCLE     = "回收站"
+	ACCOUNT_DIR_WATCH_LATER = "稍后再看"
+)
+
+func GET_ACCOUNT_DIR() []string {
+	return []string{
+		ACCOUNT_DIR_FAVOUR,
+		ACCOUNT_DIR_RECYCLE,
+		ACCOUNT_DIR_WATCH_LATER,
+	}
+}
+
+const CHANNEL_ACTION_ADD_CLIENT = 1
+const CHANNEL_ACTION_DELETE_CLIENT = 2
