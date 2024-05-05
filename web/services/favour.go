@@ -28,8 +28,16 @@ func GetAccountFavourInfoByMid(mid int) *[]*FavourFolders {
 }
 func SetFavourSyncStatus(mid, mlid, status int) {
 	db := models.GetDB()
-	db.Model(&models.FavourFoldersInfo{}).Where("mlid = ?", mlid).Update("sync", status)
+	db.Model(&models.FavourFoldersInfo{}).Where(&models.FavourFoldersInfo{Mlid: mlid}).Update("sync", status)
 	if status == consts.FAVOUR_NEED_SYNC {
-		db.Model(&models.Videos{}).Where("mid = ? AND mlid = ? AND status = ?", mid, mlid, consts.VIDEO_STATUS_INIT).Update("status", consts.VIDEO_STATUS_TO_BE_DOWNLOAD)
+		db.Model(&models.Videos{}).Where(
+			"mid = ? AND source_id = ? AND status = ? AND type = ?",
+			mid, mlid, consts.VIDEO_STATUS_INIT, consts.VIDEO_TYPE_FAVOUR,
+		).Update("status", consts.VIDEO_STATUS_TO_BE_DOWNLOAD)
+	} else if status == consts.FAVOUR_NOT_SYNC {
+		db.Model(&models.Videos{}).Where(
+			"mid = ? AND source_id = ? AND status = ? AND type = ?",
+			mid, mlid, consts.VIDEO_STATUS_TO_BE_DOWNLOAD, consts.VIDEO_TYPE_FAVOUR,
+		).Update("status", consts.VIDEO_STATUS_INIT)
 	}
 }

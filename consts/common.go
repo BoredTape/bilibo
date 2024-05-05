@@ -32,6 +32,7 @@ const (
 const (
 	VIDEO_TYPE_FAVOUR      = 1
 	VIDEO_TYPE_WATCH_LATER = 2
+	VIDEO_TYPE_COLLECTED   = 3
 )
 
 const (
@@ -55,6 +56,7 @@ const (
 	ACCOUNT_DIR_FAVOUR      = "收藏夹"
 	ACCOUNT_DIR_RECYCLE     = "回收站"
 	ACCOUNT_DIR_WATCH_LATER = "稍后再看"
+	ACCOUNT_DIR_COLLECTED   = "收藏和订阅"
 )
 
 func GET_ACCOUNT_DIR() []string {

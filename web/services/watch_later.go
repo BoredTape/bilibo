@@ -22,7 +22,7 @@ func SetWatchLaterSync(mid int, sync int) {
 	info.Sync = sync
 	db.Save(&info)
 	sql := db.Model(&models.Videos{}).Where(
-		"mid = ? AND mlid = 0 AND type = ?", mid, consts.VIDEO_TYPE_WATCH_LATER,
+		"mid = ? AND type = ?", mid, consts.VIDEO_TYPE_WATCH_LATER,
 	)
 	if sync == consts.WATCH_LATER_NEED_SYNC {
 		sql.Where("status NOT IN (?)",
