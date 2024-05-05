@@ -6,7 +6,6 @@ import (
 	"bilibo/log"
 	"bilibo/models"
 	"bilibo/scheduler"
-	"bilibo/services"
 	"bilibo/universal"
 	"bilibo/web"
 	"os"
@@ -19,7 +18,6 @@ func init() {
 	log.Init()
 	conf := config.GetConfig()
 	models.Init(conf.Server.DB.Driver, conf.Server.DB.DSN)
-	services.InitSetVideoStatus()
 	bobo.Init()
 }
 

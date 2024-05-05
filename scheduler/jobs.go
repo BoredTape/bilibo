@@ -9,10 +9,12 @@ import (
 )
 
 type refreshWbiKeyJob struct {
-	bobo *bobo.BoBo
+	taskId string
+	bobo   *bobo.BoBo
 }
 
 func (r *refreshWbiKeyJob) Run() {
+	t := InitTaskInfo(r.taskId, "更新用户信息")
 	logger := log.GetLogger()
 	logger.Info("refresh wbi key")
 	for _, clientId := range r.bobo.ClientList() {
@@ -44,80 +46,49 @@ func (r *refreshWbiKeyJob) Run() {
 			}
 		}
 	}
-
+	t.UpdateNextRunningAt(15 * 60)
 }
 
 type refreshFavListJob struct {
-	bobo *bobo.BoBo
+	taskId string
+	bobo   *bobo.BoBo
 }
 
 func (r *refreshFavListJob) Run() {
-	logger := log.GetLogger()
+	t := InitTaskInfo(r.taskId, "更新收藏夹信息")
 	for _, mid := range r.bobo.ClientList() {
-		if client, err := r.bobo.GetClient(mid); err == nil {
-			logger.Infof("user: %d refresh fav list", mid)
-			fv_svc := services.FavourVideoService{}
-			if data := r.SetFav(); data != nil {
-				fv_svc.SetMid(mid)
-				for _, fav := range data.List {
-					mlid := fav.Id
-					fv_svc.V.Mlid = mlid
-					if fret, err := client.GetFavourList(mlid, 0, "", "", 0, 20, 1, "web"); err == nil {
-						for _, media := range fret.Medias {
-							bvid := media.BvId
-							fv_svc.V.Bvid = bvid
-							if vret, err := client.GetVideoInfoByBvid(bvid); err == nil {
-								for _, page := range vret.Pages {
-									cid := page.Cid
-									fv_svc.V.Cid = cid
-									fv_svc.V.Title = vret.Title
-									fv_svc.V.Part = page.Part
-									fv_svc.V.Height = page.Dimension.Height
-									fv_svc.V.Width = page.Dimension.Width
-									fv_svc.V.Rotate = page.Dimension.Rotate
-									fv_svc.V.Page = page.Page
-									fv_svc.Save()
-								}
-
-							}
-						}
-					}
-
-				}
-			} else {
-				logger.Warnf("user %d get fav list empty", mid)
-			}
-		}
+		data := r.bobo.RefreshFav(mid)
+		r.bobo.RefreshFavVideo(mid, data)
 	}
+	t.UpdateNextRunningAt(15 * 60)
 }
 
 func (r *refreshFavListJob) SetFav() *client.AllFavourFolderInfo {
-	logger := log.GetLogger()
 	for _, mid := range r.bobo.ClientList() {
-		if client, err := r.bobo.GetClient(mid); err == nil {
-			if data, err := client.GetAllFavourFolderInfo(mid, 2, 0); err == nil {
-				folderInfo := make([]services.FolderInfo, 0)
-				for _, v := range data.List {
-					folderInfo = append(folderInfo, services.FolderInfo{
-						Id:         v.Id,
-						Fid:        v.Fid,
-						Mid:        v.Mid,
-						Attr:       v.Attr,
-						Title:      v.Title,
-						FavState:   v.FavState,
-						MediaCount: v.MediaCount,
-					})
-				}
-				serviceData := services.FavourFolderInfo{
-					Count: data.Count,
-					List:  folderInfo,
-				}
-				services.SetFavourInfo(mid, &serviceData)
-				return data
-			} else {
-				logger.Warnf("client %d get fav list error: %v", mid, err)
-			}
-		}
+		r.bobo.RefreshFav(mid)
 	}
 	return nil
+}
+
+type refreshToViewJob struct {
+	taskId string
+	bobo   *bobo.BoBo
+}
+
+func (r *refreshToViewJob) Run() {
+	t := InitTaskInfo(r.taskId, "更新稍后再看视频")
+	for _, mid := range r.bobo.ClientList() {
+		r.bobo.RefreshToView(mid)
+	}
+	t.UpdateNextRunningAt(15 * 60)
+}
+
+func InitTaskInfo(taskId string, name string) *services.TaskInfo {
+	t := services.NewTask(
+		services.WithTaskId(taskId),
+		services.WithName(name),
+		services.WithTaskType(consts.TASK_TYPE_SCHEDULER),
+	)
+	t.Save()
+	return t
 }

@@ -4,7 +4,7 @@ import (
 	"bilibo/config"
 	"bilibo/consts"
 	"bilibo/models"
-	"bilibo/realtime_job"
+	"bilibo/services"
 	"bilibo/utils"
 	"os"
 	"path/filepath"
@@ -23,12 +23,12 @@ func setup() {
 	db.Migrator().DropTable(
 		&models.BiliAccounts{},
 		&models.FavourFoldersInfo{},
-		&models.FavourVideos{},
+		&models.Videos{},
 	)
 	db.AutoMigrate(
 		&models.BiliAccounts{},
 		&models.FavourFoldersInfo{},
-		&models.FavourVideos{},
+		&models.Videos{},
 	)
 
 	account := models.BiliAccounts{
@@ -54,7 +54,7 @@ func setup() {
 	}
 	db.Save(&fav)
 
-	video1 := models.FavourVideos{
+	video1 := models.Videos{
 		Mlid:           1,
 		Mid:            1,
 		Bvid:           "abc1",
@@ -70,7 +70,7 @@ func setup() {
 	}
 	db.Save(&video1)
 
-	video2 := models.FavourVideos{
+	video2 := models.Videos{
 		Mlid:           1,
 		Mid:            1,
 		Bvid:           "abc2",
@@ -86,7 +86,7 @@ func setup() {
 	}
 	db.Save(&video2)
 
-	video3 := models.FavourVideos{
+	video3 := models.Videos{
 		Mlid:           1,
 		Mid:            1,
 		Bvid:           "abc3",
@@ -102,7 +102,7 @@ func setup() {
 	}
 	db.Save(&video3)
 
-	video4 := models.FavourVideos{
+	video4 := models.Videos{
 		Mlid:           1,
 		Mid:            1,
 		Bvid:           "abc4",
@@ -124,7 +124,7 @@ func teardown() {
 	db.Migrator().DropTable(
 		&models.BiliAccounts{},
 		&models.FavourFoldersInfo{},
-		&models.FavourVideos{},
+		&models.Videos{},
 	)
 	os.RemoveAll(config.GetConfig().Download.Path)
 }
@@ -136,7 +136,7 @@ func ChangeFavourName(t *testing.T) {
 	db := models.GetDB()
 
 	var downloadingCount1 int64
-	db.Model(&models.FavourVideos{}).Where(
+	db.Model(&models.Videos{}).Where(
 		"status IN (?)", []int{consts.VIDEO_STATUS_DOWNLOAD_FAIL, consts.VIDEO_STATUS_DOWNLOAD_RETRY, consts.VIDEO_STATUS_TO_BE_DOWNLOAD},
 	).Count(&downloadingCount1)
 
@@ -144,7 +144,7 @@ func ChangeFavourName(t *testing.T) {
 		t.Fatal("downloadingCount != 3")
 	}
 	basePath := utils.GetFavourPath(1, config.GetConfig().Download.Path)
-	go realtime_job.ChangeFavourName(1,
+	go services.ChangeFavourName(1,
 		filepath.Join(basePath, "test"),
 		filepath.Join(basePath, "test1"),
 	)
@@ -152,7 +152,7 @@ func ChangeFavourName(t *testing.T) {
 	time.Sleep(5 * time.Second)
 
 	var downloadingCount2 int64
-	db.Model(&models.FavourVideos{}).Where(
+	db.Model(&models.Videos{}).Where(
 		"status < 100",
 	).Count(&downloadingCount2)
 	if downloadingCount2 != 1 {
@@ -160,7 +160,7 @@ func ChangeFavourName(t *testing.T) {
 		t.Fatal("downloadingCount != 0")
 	}
 	time.Sleep(2 * time.Second)
-	db.Model(&models.FavourVideos{}).Where(
+	db.Model(&models.Videos{}).Where(
 		"status = ?", consts.VIDEO_STATUS_DOWNLOADING,
 	).Update("status", consts.VIDEO_STATUS_DOWNLOAD_DONE)
 	time.Sleep(3 * time.Second)
@@ -176,10 +176,10 @@ func DeleteFavour(t *testing.T) {
 	setup()
 	defer teardown()
 	db := models.GetDB()
-	go realtime_job.DeleteFavours([]int{1})
+	go services.DeleteFavours([]int{1})
 
 	time.Sleep(5 * time.Second)
-	db.Model(&models.FavourVideos{}).Where(
+	db.Model(&models.Videos{}).Where(
 		"status = ?", consts.VIDEO_STATUS_DOWNLOADING,
 	).Update("status", consts.VIDEO_STATUS_DOWNLOAD_DONE)
 	time.Sleep(3 * time.Second)

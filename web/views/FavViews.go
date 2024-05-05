@@ -2,13 +2,9 @@ package views
 
 import (
 	"bilibo/consts"
-	"bilibo/log"
-	"bilibo/utils"
 	"bilibo/web/services"
 	"net/http"
-	"slices"
 	"strconv"
-	"strings"
 
 	"github.com/gin-gonic/gin"
 )
@@ -18,7 +14,6 @@ func RegFav(rg *gin.RouterGroup) {
 	fav.GET("account_fav", accountFav)
 	fav.POST("set_sync", SetSyncFav)
 	fav.POST("set_not_sync", SetNotSyncFav)
-	fav.GET("dir", FavDir)
 }
 
 func accountFav(c *gin.Context) {
@@ -69,43 +64,4 @@ func SetNotSyncFav(c *gin.Context) {
 		"result":  0,
 	}
 	c.JSON(http.StatusOK, rsp)
-}
-
-func FavDir(c *gin.Context) {
-	logger := log.GetLogger()
-	rsp := gin.H{
-		"message": "",
-		"result":  0,
-	}
-	if queryMap, err := utils.GetQueryMap(c, []string{"q", "adapter"}); err != nil {
-		rsp["result"] = 999
-		rsp["message"] = err.Error()
-		c.JSON(http.StatusOK, rsp)
-		return
-	} else {
-		path := c.DefaultQuery("path", queryMap["adapter"]+"://")
-		if queryMap["q"] == "index" {
-			rsp = services.GetFavourIndex(queryMap["adapter"], queryMap["q"], path)
-			c.JSON(http.StatusOK, rsp)
-			return
-		} else if (queryMap["q"] == "preview" || queryMap["q"] == "download") && path != "" {
-			filePath, err := services.GetFavourFileDownload(queryMap["adapter"], queryMap["q"], path)
-			if err != nil {
-				logger.Error("get favour file download error: %v", err)
-				rsp["result"] = 999
-				rsp["message"] = err.Error()
-				c.JSON(http.StatusOK, rsp)
-			} else {
-				logger.Info("get favour file download: %s", filePath)
-				fileNameSplit := strings.Split(path, "/")
-				slices.Reverse(fileNameSplit)
-				fileName := fileNameSplit[0]
-				c.Header("Content-Description", "Simulation File Download")
-				c.Header("Content-Transfer-Encoding", "binary")
-				c.Header("Content-Disposition", "attachment; filename="+fileName)
-				c.Header("Content-Type", "application/octet-stream")
-				c.File(filePath)
-			}
-		}
-	}
 }

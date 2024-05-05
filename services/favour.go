@@ -3,13 +3,14 @@ package services
 import (
 	"bilibo/config"
 	"bilibo/consts"
+	"bilibo/log"
 	"bilibo/models"
 	"bilibo/utils"
+	"fmt"
 	"path/filepath"
 	"slices"
 	"strings"
-
-	"bilibo/realtime_job"
+	"time"
 
 	"golang.org/x/exp/maps"
 )
@@ -40,12 +41,14 @@ func SetFavourInfo(mid int, favInfo *FavourFolderInfo) {
 		existMap[v.Mlid] = v
 	}
 	existMlids := maps.Keys(existMap)
+	accountMlids := make([]int, 0)
 
 	insertList := make([]*models.FavourFoldersInfo, 0)
 	updateList := make([]*models.FavourFoldersInfo, 0)
 	deleteMlids := make([]int, 0)
 
 	for _, v := range favInfo.List {
+		accountMlids = append(accountMlids, v.Id)
 		if !slices.Contains(existMlids, v.Id) {
 			insertList = append(insertList, &models.FavourFoldersInfo{
 				Mid:        mid,
@@ -68,8 +71,12 @@ func SetFavourInfo(mid int, favInfo *FavourFolderInfo) {
 					FavState:   v.FavState,
 				})
 			}
-		} else {
-			deleteMlids = append(deleteMlids, v.Id)
+		}
+	}
+
+	for _, v := range existMlids {
+		if !slices.Contains(accountMlids, v) {
+			deleteMlids = append(deleteMlids, v)
 		}
 	}
 
@@ -80,7 +87,7 @@ func SetFavourInfo(mid int, favInfo *FavourFolderInfo) {
 	}
 
 	if len(deleteMlids) > 0 {
-		go realtime_job.DeleteFavours(deleteMlids)
+		go DeleteFavours(deleteMlids)
 	}
 
 	if len(updateList) > 0 {
@@ -93,10 +100,88 @@ func SetFavourInfo(mid int, favInfo *FavourFolderInfo) {
 				favPath := utils.GetFavourPath(existInfo.Mid, conf.Download.Path)
 				oldPath := filepath.Join(favPath, oldTitle)
 				newPath := filepath.Join(favPath, newTitle)
-				go realtime_job.ChangeFavourName(updateData.Mlid, oldPath, newPath)
+				go ChangeFavourName(updateData.Mlid, oldPath, newPath)
 			}
 			db.Model(&models.FavourFoldersInfo{}).Where("id = ?", existInfo.ID).Updates(updateData)
 		}
+	}
+}
+
+func ChangeFavourName(mlid int, oldPath, newPath string) {
+	db := models.GetDB()
+	logger := log.GetLogger()
+	sqlPause := "UPDATE favour_videos SET status=status+100 WHERE status IN (?) AND deleted_at IS NULL;"
+	value := []int{
+		consts.VIDEO_STATUS_TO_BE_DOWNLOAD,
+		consts.VIDEO_STATUS_DOWNLOAD_FAIL,
+		consts.VIDEO_STATUS_DOWNLOAD_RETRY,
+	}
+	db.Exec(sqlPause, value)
+	for {
+		t := NewTask(
+			WithTaskType(consts.TASK_TYPE_RUNNING_TIME),
+			WithName("更改收藏夹名字: "+oldPath+" => "+newPath),
+			WithTaskId(fmt.Sprintf("change_favour_name_%d", mlid)),
+		)
+		t.Save()
+		logger.Info(fmt.Sprintf("收藏夹路径更改:\n%s => %s", oldPath, newPath))
+		var downloadingCount int64
+		db.Model(&models.Videos{}).Where(
+			"mlid = ? AND status = ?", mlid, consts.VIDEO_STATUS_DOWNLOADING,
+		).Count(&downloadingCount)
+		fmt.Println(downloadingCount)
+		if downloadingCount == 0 {
+			fmt.Println(oldPath, "\n", newPath)
+			if err := utils.RenameDir(oldPath, newPath); err != nil {
+				logger.Error(err.Error())
+			}
+			sqlContinue := "UPDATE favour_videos SET status=status-100 WHERE status > 100 AND deleted_at IS NULL;"
+			db.Exec(sqlContinue)
+			break
+		} else {
+			logger.Info(fmt.Sprintf("收藏夹路径 %s 正在下载,重试中...", oldPath))
+		}
+		t.UpdateNextRunningAt(2)
+		time.Sleep(2 * time.Second)
+	}
+}
+
+func DeleteFavours(mlids []int) {
+	db := models.GetDB()
+	logger := log.GetLogger()
+	favInfos := []models.FavourFoldersInfo{}
+	db.Where("mlid IN (?)", mlids).Find(&favInfos)
+	conf := config.GetConfig()
+	basePath := conf.Download.Path
+	db.Where(
+		"mlid IN (?) AND status != ?", mlids, consts.VIDEO_STATUS_DOWNLOADING,
+	).Delete(&models.Videos{})
+	for {
+		mlidsStr := strings.Trim(strings.Replace(fmt.Sprint(mlids), " ", ",", -1), "[]")
+		fullMlidsStr := fmt.Sprintf("删除收藏夹,收藏夹IDs:[%s]", mlidsStr)
+		t := NewTask(
+			WithTaskType(consts.TASK_TYPE_RUNNING_TIME),
+			WithName(fullMlidsStr),
+			WithTaskId(fmt.Sprintf("delete_favours:%s", mlidsStr)),
+		)
+		t.Save()
+		logger.Info(fullMlidsStr)
+		var downloadingCount int64
+		db.Model(&models.Videos{}).Where(
+			"mlid IN (?) AND status = ?", mlids, consts.VIDEO_STATUS_DOWNLOADING,
+		).Count(&downloadingCount)
+		if downloadingCount == 0 {
+			db.Where("mlid IN (?)", mlids).Delete(&models.FavourFoldersInfo{})
+			db.Where("mlid IN (?)", mlids).Delete(&models.Videos{})
+			for _, fav := range favInfos {
+				utils.RecyclePath(fav.Mid, basePath, utils.Name(fav.Title))
+			}
+			break
+		} else {
+			logger.Info("收藏夹视频正在下载,重试中...")
+		}
+		t.UpdateNextRunningAt(2)
+		time.Sleep(2 * time.Second)
 	}
 }
 

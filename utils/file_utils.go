@@ -26,6 +26,10 @@ func GetFavourPath(mid int, basePath string) string {
 	return getPath(mid, basePath, consts.ACCOUNT_DIR_FAVOUR)
 }
 
+func GetWatchLaterPath(mid int, basePath string) string {
+	return getPath(mid, basePath, consts.ACCOUNT_DIR_WATCH_LATER)
+}
+
 func GetRecyclePath(mid int, basePath string) string {
 	return getPath(mid, basePath, consts.ACCOUNT_DIR_RECYCLE)
 }

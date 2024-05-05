@@ -1,6 +1,8 @@
 package models
 
 import (
+	"bilibo/consts"
+
 	"gorm.io/driver/mysql"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -11,7 +13,9 @@ var db *gorm.DB
 
 func Init(driver, dsn string) {
 	var err error
-	gConfig := gorm.Config{Logger: logger.Default.LogMode(logger.Info)}
+	gConfig := gorm.Config{
+		Logger: logger.Default.LogMode(logger.Info),
+	}
 	if driver == "mysql" {
 		db, err = gorm.Open(mysql.Open(dsn), &gConfig)
 		if err != nil {
@@ -26,13 +30,17 @@ func Init(driver, dsn string) {
 		panic("数据库驱动不支持")
 	}
 
+	db.Migrator().DropTable(&Task{}, &QRCode{})
 	db.AutoMigrate(
 		&BiliAccounts{},
 		&FavourFoldersInfo{},
-		&FavourVideos{},
+		&Videos{},
 		&QRCode{},
 		&VideoDownloadMessage{},
+		&Task{},
+		&WatchLater{},
 	)
+	db.Model(&Videos{}).Where("status = ?", consts.VIDEO_STATUS_DOWNLOADING).Update("status", consts.VIDEO_STATUS_TO_BE_DOWNLOAD)
 }
 
 func GetDB() *gorm.DB {

@@ -2,13 +2,17 @@ package views
 
 import (
 	"bilibo/config"
+	"bilibo/log"
+	"bilibo/utils"
 	"bilibo/web/services"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 	"path/filepath"
+	"slices"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 )
@@ -21,6 +25,7 @@ func RegAccount(rg *gin.RouterGroup) {
 	account.GET("proxy/:mid", accountProxy)
 	account.GET("/qrcode/:fileName", accountQrCode)
 	account.GET("/qrcode/status/:id", accountQrCodeStatus)
+	account.GET("dir", AccountDir)
 }
 
 func accountList(c *gin.Context) {
@@ -69,7 +74,7 @@ func accountDelete(c *gin.Context) {
 	var req accountDeleteReq
 	c.BindJSON(&req)
 	services.DelFavourInfoByMid(req.Mid)
-	services.DelFavourVideoByMid(req.Mid)
+	services.DelVideoByMid(req.Mid)
 	services.DelAccount(req.Mid)
 	c.JSON(http.StatusOK, gin.H{
 		"message": "account delete",
@@ -86,7 +91,7 @@ func accountSave(c *gin.Context) {
 	}
 
 	url, qrId, err := services.SetAccountInfo()
-	if err != nil {
+	if err == nil {
 		data["url"] = url
 		data["id"] = fmt.Sprintf("%d", qrId)
 		rsp["data"] = data
@@ -128,11 +133,6 @@ func accountQrCodeStatus(c *gin.Context) {
 }
 
 func accountProxy(c *gin.Context) {
-	// mid, err := strconv.Atoi(c.Param("mid"))
-	// if err != nil {
-	// 	c.JSON(500, gin.H{"message": err.Error()})
-	// 	return
-	// }
 	faceUrlEncode := c.Query("url")
 	faceUrlDecode, err := url.QueryUnescape(faceUrlEncode)
 	if err != nil {
@@ -154,4 +154,43 @@ func accountProxy(c *gin.Context) {
 		return
 	}
 	c.Writer.Write(body)
+}
+
+func AccountDir(c *gin.Context) {
+	logger := log.GetLogger()
+	rsp := gin.H{
+		"message": "",
+		"result":  0,
+	}
+	if queryMap, err := utils.GetQueryMap(c, []string{"q", "adapter"}); err != nil {
+		rsp["result"] = 999
+		rsp["message"] = err.Error()
+		c.JSON(http.StatusOK, rsp)
+		return
+	} else {
+		path := c.DefaultQuery("path", queryMap["adapter"]+"://")
+		if queryMap["q"] == "index" {
+			rsp = services.GetAccountIndex(queryMap["adapter"], queryMap["q"], path)
+			c.JSON(http.StatusOK, rsp)
+			return
+		} else if (queryMap["q"] == "preview" || queryMap["q"] == "download") && path != "" {
+			filePath, err := services.GetAccountFileDownload(queryMap["adapter"], queryMap["q"], path)
+			if err != nil {
+				logger.Error("get favour file download error: %v", err)
+				rsp["result"] = 999
+				rsp["message"] = err.Error()
+				c.JSON(http.StatusOK, rsp)
+			} else {
+				logger.Info("get favour file download: %s", filePath)
+				fileNameSplit := strings.Split(path, "/")
+				slices.Reverse(fileNameSplit)
+				fileName := fileNameSplit[0]
+				c.Header("Content-Description", "Simulation File Download")
+				c.Header("Content-Transfer-Encoding", "binary")
+				c.Header("Content-Disposition", "attachment; filename="+fileName)
+				c.Header("Content-Type", "application/octet-stream")
+				c.File(filePath)
+			}
+		}
+	}
 }

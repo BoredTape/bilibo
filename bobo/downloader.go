@@ -16,7 +16,7 @@ import (
 	"time"
 )
 
-func downloadHandler(c *client.Client, video *models.FavourVideos, basePath, path string) {
+func downloadHandler(c *client.Client, video *models.Videos, basePath, path string) {
 	mid := c.GetMid()
 	services.SetVideoStatus(video.ID, consts.VIDEO_STATUS_DOWNLOADING)
 
@@ -52,6 +52,13 @@ func downloadFavVideo(c *client.Client, ctx context.Context) {
 	mid := c.GetMid()
 	conf := config.GetConfig()
 	for {
+		accountInfo := services.GetAccountByMid(mid)
+		t := services.NewTask(
+			services.WithTaskType(consts.TASK_TYPE_RUNNING_TIME),
+			services.WithName(fmt.Sprintf("用户 [%s] 的定时下载", accountInfo.UName)),
+			services.WithTaskId(fmt.Sprintf("user_download_%d", mid)),
+		)
+		t.Save()
 		select {
 		case <-ctx.Done():
 			logger.Infof("user [%d] download exit", mid)
@@ -61,30 +68,55 @@ func downloadFavVideo(c *client.Client, ctx context.Context) {
 			video2 := services.GetRetryByMid(mid)
 			if video1 == nil && video2 == nil {
 				logger.Infof("user [%d] download finish. wait 4minutes", mid)
+				t.UpdateNextRunningAt(4 * 60)
 				time.Sleep(240 * time.Second)
 				continue
 			}
 			if video1 != nil {
-				if fav := services.GetFavourInfoByMlid(video1.Mlid); fav != nil {
-					pathDst := filepath.Join(
-						utils.GetFavourPath(mid, conf.Download.Path),
-						strings.ReplaceAll(fav.Title, "/", "⁄"),
+				pathDst := ""
+				if video1.Type == consts.VIDEO_TYPE_FAVOUR {
+					if fav := services.GetFavourInfoByMlid(video1.Mlid); fav != nil {
+						pathDst = filepath.Join(
+							utils.GetFavourPath(mid, conf.Download.Path),
+							strings.ReplaceAll(fav.Title, "/", "⁄"),
+							strings.ReplaceAll(video1.Title, "/", "⁄"),
+						)
+					}
+				} else if video1.Type == consts.VIDEO_TYPE_WATCH_LATER {
+					pathDst = filepath.Join(
+						utils.GetWatchLaterPath(mid, conf.Download.Path),
 						strings.ReplaceAll(video1.Title, "/", "⁄"),
 					)
+				}
+
+				if len(pathDst) > 0 {
 					downloadHandler(c, video1, conf.Download.Path, pathDst)
 				}
+
 			}
 			if video2 != nil {
-				if fav := services.GetFavourInfoByMlid(video1.Mlid); fav != nil {
-					pathDst := filepath.Join(
-						utils.GetFavourPath(mid, conf.Download.Path),
-						strings.ReplaceAll(fav.Title, "/", "⁄"),
-						strings.ReplaceAll(video1.Title, "/", "⁄"),
+				pathDst := ""
+				if video2.Type == consts.VIDEO_TYPE_FAVOUR {
+					if fav := services.GetFavourInfoByMlid(video2.Mlid); fav != nil {
+						pathDst = filepath.Join(
+							utils.GetFavourPath(mid, conf.Download.Path),
+							strings.ReplaceAll(fav.Title, "/", "⁄"),
+							strings.ReplaceAll(video2.Title, "/", "⁄"),
+						)
+
+					}
+				} else if video2.Type == consts.VIDEO_TYPE_WATCH_LATER {
+					pathDst = filepath.Join(
+						utils.GetWatchLaterPath(mid, conf.Download.Path),
+						strings.ReplaceAll(video2.Title, "/", "⁄"),
 					)
+				}
+				if len(pathDst) > 0 {
 					downloadHandler(c, video2, conf.Download.Path, pathDst)
 				}
 			}
 		}
 		logger.Infof("user [%d] download end", mid)
+		t.UpdateNextRunningAt(4 * 60)
 	}
 }

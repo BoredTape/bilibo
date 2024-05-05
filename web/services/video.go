@@ -8,9 +8,9 @@ import (
 	"golang.org/x/exp/maps"
 )
 
-func DelFavourVideoByMid(mid int) {
+func DelVideoByMid(mid int) {
 	db := models.GetDB()
-	db.Where(models.FavourVideos{Mid: mid}).Delete(&models.FavourVideos{})
+	db.Where(models.Videos{Mid: mid}).Delete(&models.Videos{})
 }
 
 type VideoInfo struct {
@@ -40,18 +40,20 @@ func GetVideosByStatus(status, page, pageSize int) (*[]*VideoInfo, int64) {
 
 	statusList := handleQueryStatus(status)
 
-	query := db.Model(&models.FavourVideos{}).Where("status IN (?)", statusList)
+	query := db.Model(&models.Videos{}).Where("status IN (?)", statusList)
 
 	query.Count(&total)
 
 	if total > 0 {
-		var favourVideos []models.FavourVideos
-		query.Order("updated_at DESC").Limit(pageSize).Offset((page - 1) * pageSize).Find(&favourVideos)
+		var videos []models.Videos
+		query.Order("updated_at DESC").Limit(pageSize).Offset((page - 1) * pageSize).Find(&videos)
 		accountMap := make(map[int]*AccountInfo, 0)
 		favMap := make(map[int]*FavourFolders, 0)
-		for _, v := range favourVideos {
+		for _, v := range videos {
 			accountMap[v.Mid] = nil
-			favMap[v.Mlid] = nil
+			if v.Mlid > 0 {
+				favMap[v.Mlid] = nil
+			}
 		}
 
 		var favourFolderInfos []models.FavourFoldersInfo
@@ -77,11 +79,16 @@ func GetVideosByStatus(status, page, pageSize int) (*[]*VideoInfo, int64) {
 			}
 		}
 
-		for _, v := range favourVideos {
+		for _, v := range videos {
 			favTitle := ""
-			if favMap[v.Mlid] != nil {
-				favTitle = favMap[v.Mlid].Title
+			if v.Mlid > 0 {
+				if favMap[v.Mlid] != nil {
+					favTitle = favMap[v.Mlid].Title
+				}
+			} else if v.Mlid == 0 {
+				favTitle = consts.ACCOUNT_DIR_WATCH_LATER
 			}
+
 			accountName := ""
 			if accountMap[v.Mid] != nil {
 				accountName = accountMap[v.Mid].Uname
@@ -100,4 +107,9 @@ func GetVideosByStatus(status, page, pageSize int) (*[]*VideoInfo, int64) {
 	}
 
 	return &result, total
+}
+
+func SetToViewStatus(mid int, status int) {
+	db := models.GetDB()
+	db.Model(&models.Videos{}).Where("mid = ? AND mlid = 0", mid).Update("status", status)
 }

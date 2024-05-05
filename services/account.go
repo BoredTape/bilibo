@@ -48,3 +48,10 @@ func GetAccountList() *[]models.BiliAccounts {
 	}).Find(&account)
 	return &account
 }
+
+func GetAccountByMid(mid int) *models.BiliAccounts {
+	db := models.GetDB()
+	var account models.BiliAccounts
+	db.Model(&models.BiliAccounts{}).Where("mid = ?", mid).First(&account)
+	return &account
+}

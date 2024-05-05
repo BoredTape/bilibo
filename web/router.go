@@ -16,4 +16,6 @@ func Route(r *gin.Engine) {
 	views.RegAccount(api)
 	views.RegFav(api)
 	views.RegVideo(api)
+	views.RegWatchLater(api)
+	views.RegTask(api)
 }

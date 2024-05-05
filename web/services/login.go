@@ -3,6 +3,7 @@ package services
 import (
 	"bilibo/config"
 	"bilibo/consts"
+	"bilibo/log"
 	"bilibo/universal"
 	"bilibo/utils"
 	"encoding/json"
@@ -105,7 +106,7 @@ func (c *client) getNavigation() (*navigation, int64, error) {
 	}
 	var ret *navigation
 	err = json.Unmarshal(data, &ret)
-	if err != nil {
+	if err == nil {
 		c.imgKey = ret.WbiImg.ImgUrl
 		c.subKey = ret.WbiImg.SubUrl
 		c.mid = ret.Mid
@@ -164,24 +165,32 @@ type Info struct {
 }
 
 func (c *client) loginWithQRCode(qrCode *qrCode) (*Info, error) {
+	logger := log.GetLogger()
 	if qrCode == nil {
 		return nil, errors.New("请先获取二维码")
 	}
 	for {
 		ok, err := c.qrCodeSuccess(qrCode)
 		if err != nil {
+			logger.Info("qrCodeSuccess")
+			logger.Info(err)
 			return nil, err
 		}
 		if ok {
-			c.getNavigation()
-			return &Info{
-				Cookies: c.GetCookiesString(),
-				Mid:     c.mid,
-				UName:   c.uname,
-				Face:    c.face,
-				ImgKey:  c.imgKey,
-				SubKey:  c.subKey,
-			}, nil
+			if _, _, err := c.getNavigation(); err != nil {
+				logger.Info("getNavigation")
+				logger.Info(err)
+				return nil, err
+			} else {
+				return &Info{
+					Cookies: c.GetCookiesString(),
+					Mid:     c.mid,
+					UName:   c.uname,
+					Face:    c.face,
+					ImgKey:  c.imgKey,
+					SubKey:  c.subKey,
+				}, nil
+			}
 		}
 		time.Sleep(3 * time.Second) // 主站 3s 一次请求
 	}
@@ -230,10 +239,7 @@ func SetAccountInfo() (string, int64, error) {
 	if err != nil {
 		return "", 0, err
 	}
-	qrCode, err := c.getQRCode()
-	if err != nil {
-		return "", 0, err
-	}
+
 	qrImgByte, err := qr.Encode()
 	if err != nil {
 		return "", 0, err
@@ -251,7 +257,7 @@ func SetAccountInfo() (string, int64, error) {
 	url := "/api/account/qrcode/" + fileName
 	AddQRCodeInfo(fmt.Sprintf("%d", qrId))
 	go func() {
-		if info, err := c.loginWithQRCode(qrCode); err == nil {
+		if info, err := c.loginWithQRCode(qr); err == nil {
 			SaveAccountInfo(
 				info.Mid,
 				info.UName, info.Face,

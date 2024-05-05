@@ -37,7 +37,7 @@ func (f *FavourFoldersInfo) TableName() string {
 	return "favour_folders_info"
 }
 
-type FavourVideos struct {
+type Videos struct {
 	gorm.Model
 	Mlid   int
 	Mid    int
@@ -51,11 +51,12 @@ type FavourVideos struct {
 	Rotate int // 是否将宽高对换，0：正常，1：对换
 
 	Status         int
+	Type           int
 	LastDownloadAt *time.Time
 }
 
-func (f *FavourVideos) TableName() string {
-	return "favour_videos"
+func (f *Videos) TableName() string {
+	return "videos"
 }
 
 type QRCode struct {
@@ -79,4 +80,27 @@ type VideoDownloadMessage struct {
 
 func (f *VideoDownloadMessage) TableName() string {
 	return "video_download_message"
+}
+
+type Task struct {
+	gorm.Model
+	TaskId        string `gorm:"column:task_id"`
+	Name          string
+	LastRunningAt *time.Time
+	NextRunningAt *time.Time
+	Type          int
+}
+
+func (f *Task) TableName() string {
+	return "task"
+}
+
+type WatchLater struct {
+	gorm.Model
+	Mid  int
+	Sync int
+}
+
+func (f *WatchLater) TableName() string {
+	return "watch_later"
 }
