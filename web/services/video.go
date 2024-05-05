@@ -18,10 +18,11 @@ type VideoInfo struct {
 	Title       string `json:"title"`
 	Bvid        string `json:"bvid"`
 	Status      int    `json:"status"`
-	Mlid        int    `json:"mlid"`
-	FavTitle    string `json:"fav_title"`
+	SourceId    int    `json:"source_id"`
+	SourceTitle string `json:"source_title"`
 	Mid         int    `json:"mid"`
 	AccountName string `json:"account_name"`
+	Type        int    `json:"type"`
 }
 
 func handleQueryStatus(status int) []int {
@@ -51,8 +52,8 @@ func GetVideosByStatus(status, page, pageSize int) (*[]*VideoInfo, int64) {
 		favMap := make(map[int]*FavourFolders, 0)
 		for _, v := range videos {
 			accountMap[v.Mid] = nil
-			if v.Mlid > 0 {
-				favMap[v.Mlid] = nil
+			if v.Type == consts.VIDEO_TYPE_FAVOUR {
+				favMap[v.SourceId] = nil
 			}
 		}
 
@@ -80,13 +81,13 @@ func GetVideosByStatus(status, page, pageSize int) (*[]*VideoInfo, int64) {
 		}
 
 		for _, v := range videos {
-			favTitle := ""
-			if v.Mlid > 0 {
-				if favMap[v.Mlid] != nil {
-					favTitle = favMap[v.Mlid].Title
+			sourceTitle := ""
+			if v.Type == consts.VIDEO_TYPE_FAVOUR {
+				if favMap[v.SourceId] != nil {
+					sourceTitle = fmt.Sprintf("收藏夹：%s", favMap[v.SourceId].Title)
 				}
-			} else if v.Mlid == 0 {
-				favTitle = consts.ACCOUNT_DIR_WATCH_LATER
+			} else if v.Type == consts.VIDEO_TYPE_WATCH_LATER {
+				sourceTitle = consts.ACCOUNT_DIR_WATCH_LATER
 			}
 
 			accountName := ""
@@ -98,10 +99,11 @@ func GetVideosByStatus(status, page, pageSize int) (*[]*VideoInfo, int64) {
 				Title:       v.Title,
 				Bvid:        v.Bvid,
 				Status:      v.Status,
-				Mlid:        v.Mlid,
-				FavTitle:    favTitle,
+				SourceId:    v.SourceId,
+				SourceTitle: sourceTitle,
 				Mid:         v.Mid,
 				AccountName: accountName,
+				Type:        v.Type,
 			})
 		}
 	}
@@ -111,5 +113,7 @@ func GetVideosByStatus(status, page, pageSize int) (*[]*VideoInfo, int64) {
 
 func SetToViewStatus(mid int, status int) {
 	db := models.GetDB()
-	db.Model(&models.Videos{}).Where("mid = ? AND mlid = 0", mid).Update("status", status)
+	db.Model(&models.Videos{}).Where(
+		"mid = ? AND type = ?", consts.VIDEO_TYPE_WATCH_LATER,
+	).Update("status", status)
 }

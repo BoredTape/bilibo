@@ -21,9 +21,9 @@ func downloadHandler(c *client.Client, video *models.Videos, basePath, path stri
 	services.SetVideoStatus(video.ID, consts.VIDEO_STATUS_DOWNLOADING)
 
 	videoStatus := consts.VIDEO_STATUS_DOWNLOAD_RETRY
-	if fav := services.GetFavourInfoByMlid(video.Mlid); fav != nil {
+	if fav := services.GetFavourInfoByMlid(video.SourceId); fav != nil {
 		tmpFilePath := filepath.Join(basePath, ".tmp")
-		fileName := fmt.Sprintf("%d_%d_%s_%d", mid, video.Mlid, video.Bvid, video.Cid)
+		fileName := fmt.Sprintf("%d_%d_%s_%d", mid, video.SourceId, video.Bvid, video.Cid)
 		if dFilePath, dmimeType, err := c.DownloadVideoBestByBvidCid(
 			video.Cid, video.Bvid, tmpFilePath, fileName,
 		); err == nil {
@@ -34,20 +34,20 @@ func downloadHandler(c *client.Client, video *models.Videos, basePath, path stri
 			utils.RenameDir(dFilePath, distPath)
 		} else if err == consts.ERROR_DOWNLOAD_403 {
 			errorInfo := fmt.Sprintf("user [%d] download video [%s] error: %v. try it later", mid, video.Bvid, err)
-			services.SetVideoErrorMessage(video.Mlid, mid, video.Bvid, errorInfo)
+			services.SetVideoErrorMessage(video.SourceId, mid, video.Bvid, errorInfo)
 			videoStatus = consts.VIDEO_STATUS_DOWNLOAD_RETRY
 		} else {
 			errorInfo := fmt.Sprintf("user [%d] get video [%s] info error: %v", mid, video.Bvid, err)
-			services.SetVideoErrorMessage(video.Mlid, mid, video.Bvid, errorInfo)
+			services.SetVideoErrorMessage(video.SourceId, mid, video.Bvid, errorInfo)
 		}
 	} else {
-		errorInfo := fmt.Sprintf("user [%d] video [%s] favour [%d] info not found in db", mid, video.Bvid, video.Mlid)
-		services.SetVideoErrorMessage(video.Mlid, mid, video.Bvid, errorInfo)
+		errorInfo := fmt.Sprintf("user [%d] video [%s] favour [%d] info not found in db", mid, video.Bvid, video.SourceId)
+		services.SetVideoErrorMessage(video.SourceId, mid, video.Bvid, errorInfo)
 	}
 	services.SetVideoStatus(video.ID, videoStatus)
 }
 
-func downloadFavVideo(c *client.Client, ctx context.Context) {
+func downloadVideo(c *client.Client, ctx context.Context) {
 	logger := log.GetLogger()
 	mid := c.GetMid()
 	conf := config.GetConfig()
@@ -75,7 +75,7 @@ func downloadFavVideo(c *client.Client, ctx context.Context) {
 			if video1 != nil {
 				pathDst := ""
 				if video1.Type == consts.VIDEO_TYPE_FAVOUR {
-					if fav := services.GetFavourInfoByMlid(video1.Mlid); fav != nil {
+					if fav := services.GetFavourInfoByMlid(video1.SourceId); fav != nil {
 						pathDst = filepath.Join(
 							utils.GetFavourPath(mid, conf.Download.Path),
 							strings.ReplaceAll(fav.Title, "/", "⁄"),
@@ -97,7 +97,7 @@ func downloadFavVideo(c *client.Client, ctx context.Context) {
 			if video2 != nil {
 				pathDst := ""
 				if video2.Type == consts.VIDEO_TYPE_FAVOUR {
-					if fav := services.GetFavourInfoByMlid(video2.Mlid); fav != nil {
+					if fav := services.GetFavourInfoByMlid(video2.SourceId); fav != nil {
 						pathDst = filepath.Join(
 							utils.GetFavourPath(mid, conf.Download.Path),
 							strings.ReplaceAll(fav.Title, "/", "⁄"),

@@ -39,16 +39,16 @@ func (f *FavourFoldersInfo) TableName() string {
 
 type Videos struct {
 	gorm.Model
-	Mlid   int
-	Mid    int
-	Bvid   string
-	Cid    int
-	Page   int
-	Title  string
-	Part   string
-	Width  int // 当前分P 宽度
-	Height int // 当前分P 高度
-	Rotate int // 是否将宽高对换，0：正常，1：对换
+	SourceId int
+	Mid      int
+	Bvid     string
+	Cid      int
+	Page     int
+	Title    string
+	Part     string
+	Width    int // 当前分P 宽度
+	Height   int // 当前分P 高度
+	Rotate   int // 是否将宽高对换，0：正常，1：对换
 
 	Status         int
 	Type           int

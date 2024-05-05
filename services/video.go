@@ -21,18 +21,18 @@ func (f *VideoService) Save() {
 	db := models.GetDB()
 	var video models.Videos
 	db.Where(models.Videos{
-		Bvid: f.V.Bvid,
-		Mlid: f.V.Mlid,
-		Mid:  f.V.Mid,
-		Cid:  f.V.Cid,
-		Type: f.V.Type,
+		Bvid:     f.V.Bvid,
+		SourceId: f.V.SourceId,
+		Mid:      f.V.Mid,
+		Cid:      f.V.Cid,
+		Type:     f.V.Type,
 	}).FirstOrInit(&video)
 	needUpdata := false
 	if video.ID == 0 && f.V.Type == consts.VIDEO_TYPE_WATCH_LATER {
 		video.Status = consts.VIDEO_STATUS_INIT
 		needUpdata = true
 	} else if video.ID == 0 && f.V.Type == consts.VIDEO_TYPE_FAVOUR {
-		favInfo := GetFavourInfoByMlid(f.V.Mlid)
+		favInfo := GetFavourInfoByMlid(f.V.SourceId)
 		video.Status = consts.VIDEO_STATUS_INIT
 		if favInfo != nil && favInfo.Sync == consts.FAVOUR_NEED_SYNC {
 			video.Status = consts.VIDEO_STATUS_TO_BE_DOWNLOAD
@@ -75,9 +75,9 @@ func GetVideoByMidStatus(mid, status int) *models.Videos {
 	subQuery := db.Model(&models.FavourFoldersInfo{}).Where(
 		&models.FavourFoldersInfo{Mid: mid, Sync: consts.FAVOUR_NEED_SYNC},
 	).Select("mlid")
-	db.Where(
-		"mid = ? AND status = ? AND (mlid IN (?) OR mlid = 0)",
-		mid, status, subQuery,
+	db.Model(&models.Videos{}).Where(
+		"mid = ? AND status = ? AND ((source_id IN (?) AND type = ?) OR (type = ?))",
+		mid, status, subQuery, consts.VIDEO_TYPE_FAVOUR, consts.VIDEO_TYPE_WATCH_LATER,
 	).First(&video)
 	if video.ID == 0 {
 		return nil
@@ -98,8 +98,8 @@ func GetRetryByMid(mid int) *models.Videos {
 		&models.FavourFoldersInfo{Mid: mid, Sync: consts.FAVOUR_NEED_SYNC},
 	).Select("mlid")
 	db.Model(&models.Videos{}).Where(
-		"mid = ? AND status = ? AND (mlid IN (?) OR mlid = 0) AND last_download_at < ?",
-		mid, consts.VIDEO_STATUS_DOWNLOAD_RETRY, subQuery, last_time,
+		"mid = ? AND status = ? AND last_download_at < ? AND ((source_id IN (?) AND type = ?) OR (type = ?))",
+		mid, consts.VIDEO_STATUS_DOWNLOAD_RETRY, last_time, subQuery, consts.VIDEO_TYPE_FAVOUR, consts.VIDEO_TYPE_WATCH_LATER,
 	).First(&video)
 	if video.ID == 0 {
 		return nil
