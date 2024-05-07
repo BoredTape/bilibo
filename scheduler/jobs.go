@@ -2,7 +2,6 @@ package scheduler
 
 import (
 	"bilibo/bobo"
-	"bilibo/bobo/client"
 	"bilibo/consts"
 	"bilibo/log"
 	"bilibo/services"
@@ -49,36 +48,17 @@ func (r *refreshWbiKeyJob) Run() {
 	t.UpdateNextRunningAt(15 * 60)
 }
 
-type refreshFavListJob struct {
+type refreshVideoJob struct {
 	taskId string
 	bobo   *bobo.BoBo
 }
 
-func (r *refreshFavListJob) Run() {
-	t := InitTaskInfo(r.taskId, "更新收藏夹信息")
-	for _, mid := range r.bobo.ClientList() {
-		data := r.bobo.RefreshFav(mid)
-		r.bobo.RefreshFavVideo(mid, data)
-	}
-	t.UpdateNextRunningAt(15 * 60)
-}
-
-func (r *refreshFavListJob) SetFav() *client.AllFavourFolderInfo {
-	for _, mid := range r.bobo.ClientList() {
-		r.bobo.RefreshFav(mid)
-	}
-	return nil
-}
-
-type refreshToViewJob struct {
-	taskId string
-	bobo   *bobo.BoBo
-}
-
-func (r *refreshToViewJob) Run() {
-	t := InitTaskInfo(r.taskId, "更新稍后再看视频")
-	for _, mid := range r.bobo.ClientList() {
-		r.bobo.RefreshToView(mid)
+func (r *refreshVideoJob) Run() {
+	t := InitTaskInfo(r.taskId, "更新用户视频信息")
+	logger := log.GetLogger()
+	logger.Info("refresh user video info")
+	for _, clientId := range r.bobo.ClientList() {
+		r.bobo.RefreshAll(clientId)
 	}
 	t.UpdateNextRunningAt(15 * 60)
 }
