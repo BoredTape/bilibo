@@ -37,19 +37,42 @@ func (f *FavourFoldersInfo) TableName() string {
 	return "favour_folders_info"
 }
 
+type CollectedInfo struct {
+	gorm.Model
+	CollId     int
+	Mid        int    // 账号ID
+	Attr       int    // 属性位（？）
+	Title      string // 订阅标题
+	MediaCount int    // 订阅内容数量
+	Sync       int    // 是否同步，0：否，1：是
+}
+
+func (f *CollectedInfo) TableName() string {
+	return "collected_info"
+}
+
+type VideosInfo struct {
+	gorm.Model
+	Bvid   string
+	Cid    int
+	Page   int
+	Title  string
+	Part   string
+	Width  int // 当前分P 宽度
+	Height int // 当前分P 高度
+	Rotate int // 是否将宽高对换，0：正常，1：对换
+}
+
+func (f *VideosInfo) TableName() string {
+	return "videos_info"
+}
+
 type Videos struct {
 	gorm.Model
-	SourceId int
-	Mid      int
-	Bvid     string
-	Cid      int
-	Page     int
-	Title    string
-	Part     string
-	Width    int // 当前分P 宽度
-	Height   int // 当前分P 高度
-	Rotate   int // 是否将宽高对换，0：正常，1：对换
-
+	SourceId       int
+	Mid            int
+	Bvid           string
+	Cid            int
 	Status         int
 	Type           int
 	LastDownloadAt *time.Time
@@ -71,11 +94,12 @@ func (f *QRCode) TableName() string {
 
 type VideoDownloadMessage struct {
 	gorm.Model
-	Mlid    int
-	Mid     int
-	Bvid    string
-	Message string
-	Type    int
+	SourceId  int
+	Mid       int
+	Bvid      string
+	Message   string
+	Type      int
+	VideoType int
 }
 
 func (f *VideoDownloadMessage) TableName() string {

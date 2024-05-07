@@ -26,7 +26,8 @@ func main() {
 	os.RemoveAll(filepath.Join(conf.Download.Path, ".tmp"))
 	os.MkdirAll(filepath.Join(conf.Download.Path, ".tmp"), os.ModePerm)
 
-	scheduler.BiliBoSched(bobo.GetBoBo())
+	b := bobo.GetBoBo()
+	scheduler.BiliBoSched(b)
 	scheduler.Start()
 
 	web.Run()

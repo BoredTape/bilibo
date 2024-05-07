@@ -59,12 +59,6 @@ func setup() {
 		Mid:            1,
 		Bvid:           "abc1",
 		Cid:            1,
-		Page:           1,
-		Title:          "testVideo2",
-		Part:           "testPart2",
-		Width:          1,
-		Height:         1,
-		Rotate:         1,
 		Status:         consts.VIDEO_STATUS_DOWNLOADING,
 		LastDownloadAt: nil,
 		Type:           consts.VIDEO_TYPE_FAVOUR,
@@ -76,12 +70,6 @@ func setup() {
 		Mid:            1,
 		Bvid:           "abc2",
 		Cid:            1,
-		Page:           1,
-		Title:          "testVideo2",
-		Part:           "testPart2",
-		Width:          1,
-		Height:         1,
-		Rotate:         1,
 		Status:         consts.VIDEO_STATUS_DOWNLOAD_FAIL,
 		LastDownloadAt: nil,
 		Type:           consts.VIDEO_TYPE_FAVOUR,
@@ -93,12 +81,6 @@ func setup() {
 		Mid:            1,
 		Bvid:           "abc3",
 		Cid:            1,
-		Page:           1,
-		Title:          "testVideo3",
-		Part:           "testPart3",
-		Width:          1,
-		Height:         1,
-		Rotate:         1,
 		Status:         consts.VIDEO_STATUS_DOWNLOAD_RETRY,
 		LastDownloadAt: nil,
 		Type:           consts.VIDEO_TYPE_FAVOUR,
@@ -110,12 +92,6 @@ func setup() {
 		Mid:            1,
 		Bvid:           "abc4",
 		Cid:            1,
-		Page:           1,
-		Title:          "testVideo4",
-		Part:           "testPart4",
-		Width:          1,
-		Height:         1,
-		Rotate:         1,
 		Status:         consts.VIDEO_STATUS_TO_BE_DOWNLOAD,
 		LastDownloadAt: nil,
 		Type:           consts.VIDEO_TYPE_FAVOUR,
@@ -181,7 +157,7 @@ func DeleteFavour(t *testing.T) {
 	setup()
 	defer teardown()
 	db := models.GetDB()
-	go services.DeleteFavours([]int{1})
+	go services.DeleteFavours(1, []int{1})
 
 	time.Sleep(5 * time.Second)
 	db.Model(&models.Videos{}).Where(

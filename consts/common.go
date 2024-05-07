@@ -14,6 +14,11 @@ const (
 	FAVOUR_NEED_SYNC = 1
 )
 
+const (
+	COLLECTED_NOT_SYNC  = 0
+	COLLECTED_NEED_SYNC = 1
+)
+
 // 任务类型
 const (
 	TASK_TYPE_SCHEDULER    = 1
