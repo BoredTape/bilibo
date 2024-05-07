@@ -26,6 +26,10 @@ func GetFavourPath(mid int, basePath string) string {
 	return getPath(mid, basePath, consts.ACCOUNT_DIR_FAVOUR)
 }
 
+func GetCollectedPath(mid int, basePath string) string {
+	return getPath(mid, basePath, consts.ACCOUNT_DIR_COLLECTED)
+}
+
 func GetWatchLaterPath(mid int, basePath string) string {
 	return getPath(mid, basePath, consts.ACCOUNT_DIR_WATCH_LATER)
 }
@@ -51,12 +55,12 @@ func RenameDir(oldPath string, newPath string) error {
 	return nil
 }
 
-func RecyclePath(mid int, basePath, favourName string) error {
+func RecyclePath(mid int, basePath, dirPath, dirName string) error {
 	recyclePath := GetRecyclePath(mid, basePath)
 	timeNow := time.Now()
 	favourPath := filepath.Join(
-		GetFavourPath(mid, basePath), favourName,
+		dirPath, dirName,
 	)
-	deletePath := filepath.Join(recyclePath, fmt.Sprintf("%s_%d", favourName, timeNow.Unix()))
+	deletePath := filepath.Join(recyclePath, fmt.Sprintf("%s_%d", dirName, timeNow.Unix()))
 	return RenameDir(favourPath, deletePath)
 }

@@ -4,3 +4,4 @@ data.db
 web/dist/*
 build/*
 bilibo
+*.session.sql

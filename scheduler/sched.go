@@ -21,18 +21,13 @@ func BiliBoSched(bobo *bobo.BoBo) {
 	refreshWbiKey.Run()
 	sched.AddJob("*/15 * * * *", &refreshWbiKey)
 
-	refreshFavList := refreshFavListJob{"RefreshFavListJob", bobo}
-	sched.AddJob("*/15 * * * *", &refreshFavList)
-
-	refreshToView := refreshToViewJob{"RefreshToViewJob", bobo}
-	sched.AddJob("*/15 * * * *", &refreshToView)
+	refreshVideoList := refreshVideoJob{"refreshVideoJob", bobo}
+	sched.AddJob("*/15 * * * *", &refreshVideoList)
 }
 
 func Start() {
 	sched.Start()
-	t := InitTaskInfo("RefreshFavListJob", "更新收藏夹信息")
-	t.UpdateNextRunningAt(15 * 60)
-	t = InitTaskInfo("RefreshToViewJob", "更新稍后再看视频")
+	t := InitTaskInfo("refreshVideoJob", "更新用户视频信息")
 	t.UpdateNextRunningAt(15 * 60)
 }
 

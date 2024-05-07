@@ -80,6 +80,14 @@ type FavourFolders struct {
 	Sync       int    `json:"sync"`
 }
 
+type Collected struct {
+	CollId     int    `json:"coll_id"`
+	Attr       int    `json:"attr"`
+	Title      string `json:"title"`
+	MediaCount int    `json:"media_count"`
+	Sync       int    `json:"sync"`
+}
+
 type AccountInfo struct {
 	Mid             int              `json:"mid"`
 	Uname           string           `json:"uname"`
@@ -89,6 +97,8 @@ type AccountInfo struct {
 	Folders         []*FavourFolders `json:"folders"`
 	WatchLaterCount int64            `json:"watch_later_count"`
 	WatchLaterSync  int              `json:"watch_later_sync"`
+	Collected       []*Collected     `json:"collected"`
+	CollectedCount  int              `json:"collected_count"`
 }
 
 type AccountWatchLaterCount struct {
@@ -103,7 +113,7 @@ type AccountWatchLaterSync struct {
 
 func AccountList(page, pageSize int) (*[]*AccountInfo, int64) {
 	db := models.GetDB()
-	accountMap := make(map[int]*AccountInfo, 0)
+	accountMap := make(map[int]*AccountInfo)
 	accountMids := make([]int, 0)
 	total := AccountTotal()
 	if total > 0 {
@@ -140,6 +150,20 @@ func AccountList(page, pageSize int) (*[]*AccountInfo, int64) {
 			}
 			accountMap[v.Mid].Folders = append(accountMap[v.Mid].Folders, &folders)
 			accountMap[v.Mid].FoldersCount++
+		}
+
+		var collectedInfos []models.CollectedInfo
+		db.Model(&models.CollectedInfo{}).Where("mid IN (?)", accountMids).Find(&collectedInfos)
+		for _, v := range collectedInfos {
+			collected := Collected{
+				CollId:     v.CollId,
+				Attr:       v.Attr,
+				Title:      v.Title,
+				MediaCount: v.MediaCount,
+				Sync:       v.Sync,
+			}
+			accountMap[v.Mid].Collected = append(accountMap[v.Mid].Collected, &collected)
+			accountMap[v.Mid].CollectedCount++
 		}
 
 		watchLaterCount := make([]AccountWatchLaterCount, 0)

@@ -87,15 +87,15 @@ func SetFavourInfo(mid int, favInfo *FavourFolderInfo) {
 	}
 
 	if len(deleteMlids) > 0 {
-		go DeleteFavours(deleteMlids)
+		go DeleteFavours(mid, deleteMlids)
 	}
 
 	if len(updateList) > 0 {
 		conf := config.GetConfig()
 		for _, updateData := range updateList {
 			existInfo := existMap[updateData.Mlid]
-			oldTitle := strings.ReplaceAll(existInfo.Title, "/", "⁄")
-			newTitle := strings.ReplaceAll(updateData.Title, "/", "⁄")
+			oldTitle := utils.Name(existInfo.Title)
+			newTitle := utils.Name(updateData.Title)
 			if newTitle != oldTitle {
 				favPath := utils.GetFavourPath(existInfo.Mid, conf.Download.Path)
 				oldPath := filepath.Join(favPath, oldTitle)
@@ -119,13 +119,13 @@ func ChangeFavourName(mlid int, oldPath, newPath string) {
 		consts.VIDEO_STATUS_DOWNLOAD_RETRY,
 	}
 	db.Exec(sqlPause, value, mlid, consts.VIDEO_TYPE_FAVOUR)
+	t := NewTask(
+		WithTaskType(consts.TASK_TYPE_RUNNING_TIME),
+		WithName("更改收藏夹名字: "+oldPath+" => "+newPath),
+		WithTaskId(fmt.Sprintf("change_favour_name_%d", mlid)),
+	)
+	t.Save()
 	for {
-		t := NewTask(
-			WithTaskType(consts.TASK_TYPE_RUNNING_TIME),
-			WithName("更改收藏夹名字: "+oldPath+" => "+newPath),
-			WithTaskId(fmt.Sprintf("change_favour_name_%d", mlid)),
-		)
-		t.Save()
 		logger.Info(fmt.Sprintf("收藏夹路径更改:\n%s => %s", oldPath, newPath))
 		var downloadingCount int64
 		db.Model(&models.Videos{}).Where(
@@ -147,44 +147,46 @@ func ChangeFavourName(mlid int, oldPath, newPath string) {
 		t.UpdateNextRunningAt(2)
 		time.Sleep(2 * time.Second)
 	}
+	t.Delete()
 }
 
-func DeleteFavours(mlids []int) {
+func DeleteFavours(mid int, mlids []int) {
 	db := models.GetDB()
 	logger := log.GetLogger()
 	favInfos := []models.FavourFoldersInfo{}
-	db.Where("mlid IN (?)", mlids).Find(&favInfos)
+	db.Where("mlid IN (?) AND mid = ?", mlids, mid).Find(&favInfos)
 	conf := config.GetConfig()
 	basePath := conf.Download.Path
 	db.Where(
-		"source_id IN (?) AND type = ? AND status != ?",
+		"source_id IN (?) AND type = ? AND status != ? AND mid = ?",
 		mlids, consts.VIDEO_TYPE_FAVOUR,
 		consts.VIDEO_STATUS_DOWNLOADING,
+		mid,
 	).Delete(&models.Videos{})
+	mlidsStr := strings.Trim(strings.Replace(fmt.Sprint(mlids), " ", ",", -1), "[]")
+	fullMlidsStr := fmt.Sprintf("删除收藏夹,收藏夹IDs:[%s]", mlidsStr)
+	t := NewTask(
+		WithTaskType(consts.TASK_TYPE_RUNNING_TIME),
+		WithName(fullMlidsStr),
+		WithTaskId(fmt.Sprintf("delete_favours:%s", mlidsStr)),
+	)
+	t.Save()
 	for {
-		mlidsStr := strings.Trim(strings.Replace(fmt.Sprint(mlids), " ", ",", -1), "[]")
-		fullMlidsStr := fmt.Sprintf("删除收藏夹,收藏夹IDs:[%s]", mlidsStr)
-		t := NewTask(
-			WithTaskType(consts.TASK_TYPE_RUNNING_TIME),
-			WithName(fullMlidsStr),
-			WithTaskId(fmt.Sprintf("delete_favours:%s", mlidsStr)),
-		)
-		t.Save()
-		logger.Info(fullMlidsStr)
 		var downloadingCount int64
 		db.Model(&models.Videos{}).Where(
-			"source_id IN (?) AND type = ? AND status = ?",
+			"source_id IN (?) AND type = ? AND status = ? AND mid = ?",
 			mlids, consts.VIDEO_TYPE_FAVOUR,
 			consts.VIDEO_STATUS_DOWNLOADING,
+			mid,
 		).Count(&downloadingCount)
 		if downloadingCount == 0 {
-			db.Where("mlid IN (?)", mlids).Delete(&models.FavourFoldersInfo{})
+			db.Where("mlid IN (?) AND mid = ?", mlids, mid).Delete(&models.FavourFoldersInfo{})
 			db.Where(
-				"source_id IN (?) AND type = ?",
-				mlids, consts.VIDEO_TYPE_FAVOUR,
+				"source_id IN (?) AND type = ? AND mid = ?",
+				mlids, consts.VIDEO_TYPE_FAVOUR, mid,
 			).Delete(&models.Videos{})
 			for _, fav := range favInfos {
-				utils.RecyclePath(fav.Mid, basePath, utils.Name(fav.Title))
+				utils.RecyclePath(fav.Mid, basePath, utils.GetFavourPath(fav.Mid, basePath), utils.Name(fav.Title))
 			}
 			break
 		} else {
@@ -193,6 +195,7 @@ func DeleteFavours(mlids []int) {
 		t.UpdateNextRunningAt(2)
 		time.Sleep(2 * time.Second)
 	}
+	t.Delete()
 }
 
 func GetFavourInfoByMlid(mlid int) *models.FavourFoldersInfo {

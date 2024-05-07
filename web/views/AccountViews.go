@@ -76,6 +76,8 @@ func accountDelete(c *gin.Context) {
 	services.DelFavourInfoByMid(req.Mid)
 	services.DelVideoByMid(req.Mid)
 	services.DelAccount(req.Mid)
+	services.DelWatchLaterByMid(req.Mid)
+	services.DelCollectedByMid(req.Mid)
 	c.JSON(http.StatusOK, gin.H{
 		"message": "account delete",
 		"result":  0,

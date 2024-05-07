@@ -35,10 +35,12 @@ func Init(driver, dsn string) {
 		&BiliAccounts{},
 		&FavourFoldersInfo{},
 		&Videos{},
+		&VideosInfo{},
 		&QRCode{},
 		&VideoDownloadMessage{},
 		&Task{},
 		&WatchLater{},
+		&CollectedInfo{},
 	)
 	db.Model(&Videos{}).Where("status = ?", consts.VIDEO_STATUS_DOWNLOADING).Update("status", consts.VIDEO_STATUS_TO_BE_DOWNLOAD)
 }

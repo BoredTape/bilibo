@@ -28,7 +28,9 @@ func GetAccountFavourInfoByMid(mid int) *[]*FavourFolders {
 }
 func SetFavourSyncStatus(mid, mlid, status int) {
 	db := models.GetDB()
-	db.Model(&models.FavourFoldersInfo{}).Where(&models.FavourFoldersInfo{Mlid: mlid}).Update("sync", status)
+	db.Model(&models.FavourFoldersInfo{}).Where(
+		&models.FavourFoldersInfo{Mlid: mlid, Mid: mid},
+	).Update("sync", status)
 	if status == consts.FAVOUR_NEED_SYNC {
 		db.Model(&models.Videos{}).Where(
 			"mid = ? AND source_id = ? AND status = ? AND type = ?",

@@ -4,89 +4,25 @@ import (
 	"bilibo/consts"
 	"bilibo/log"
 	"bilibo/models"
+	"bilibo/utils"
+	"fmt"
+	"math"
 	"time"
+
+	"golang.org/x/exp/maps"
 )
 
-type VideoService struct {
-	V *models.Videos
-}
-
-func (f *VideoService) SetMid(mid int) {
-	f.V = &models.Videos{
-		Mid: mid,
-	}
-}
-
-func (f *VideoService) Save() {
+func GetToBeDownloadByMid(mid int) *models.Videos {
 	db := models.GetDB()
 	var video models.Videos
-	db.Where(models.Videos{
-		Bvid:     f.V.Bvid,
-		SourceId: f.V.SourceId,
-		Mid:      f.V.Mid,
-		Cid:      f.V.Cid,
-		Type:     f.V.Type,
-	}).FirstOrInit(&video)
-	needUpdata := false
-	if video.ID == 0 && f.V.Type == consts.VIDEO_TYPE_WATCH_LATER {
-		video.Status = consts.VIDEO_STATUS_INIT
-		needUpdata = true
-	} else if video.ID == 0 && f.V.Type == consts.VIDEO_TYPE_FAVOUR {
-		favInfo := GetFavourInfoByMlid(f.V.SourceId)
-		video.Status = consts.VIDEO_STATUS_INIT
-		if favInfo != nil && favInfo.Sync == consts.FAVOUR_NEED_SYNC {
-			video.Status = consts.VIDEO_STATUS_TO_BE_DOWNLOAD
-		}
-		needUpdata = true
-	}
-	if video.Part != f.V.Part {
-		video.Part = f.V.Part
-		needUpdata = true
-	}
-	if video.Width != f.V.Width {
-		video.Width = f.V.Width
-		needUpdata = true
-	}
-	if video.Height != f.V.Height {
-		video.Height = f.V.Height
-		needUpdata = true
-	}
-	if video.Rotate != f.V.Rotate {
-		video.Rotate = f.V.Rotate
-		needUpdata = true
-	}
-	if video.Title != f.V.Title {
-		video.Title = f.V.Title
-		needUpdata = true
-	}
-	if video.Page != f.V.Page {
-		video.Page = f.V.Page
-		needUpdata = true
-	}
-	if needUpdata {
-		db.Save(&video)
-	}
-
-}
-
-func GetVideoByMidStatus(mid, status int) *models.Videos {
-	db := models.GetDB()
-	var video models.Videos
-	subQuery := db.Model(&models.FavourFoldersInfo{}).Where(
-		&models.FavourFoldersInfo{Mid: mid, Sync: consts.FAVOUR_NEED_SYNC},
-	).Select("mlid")
 	db.Model(&models.Videos{}).Where(
-		"mid = ? AND status = ? AND ((source_id IN (?) AND type = ?) OR (type = ?))",
-		mid, status, subQuery, consts.VIDEO_TYPE_FAVOUR, consts.VIDEO_TYPE_WATCH_LATER,
+		"mid = ? AND status = ?",
+		mid, consts.VIDEO_STATUS_TO_BE_DOWNLOAD,
 	).First(&video)
 	if video.ID == 0 {
 		return nil
 	}
 	return &video
-}
-
-func GetToBeDownloadByMid(mid int) *models.Videos {
-	return GetVideoByMidStatus(mid, consts.VIDEO_STATUS_TO_BE_DOWNLOAD)
 }
 
 func GetRetryByMid(mid int) *models.Videos {
@@ -97,9 +33,12 @@ func GetRetryByMid(mid int) *models.Videos {
 	subQuery := db.Model(&models.FavourFoldersInfo{}).Where(
 		&models.FavourFoldersInfo{Mid: mid, Sync: consts.FAVOUR_NEED_SYNC},
 	).Select("mlid")
+	subQueryCollected := db.Model(&models.CollectedInfo{}).Where(
+		&models.CollectedInfo{Mid: mid, Sync: consts.COLLECTED_NEED_SYNC},
+	).Select("coll_id")
 	db.Model(&models.Videos{}).Where(
-		"mid = ? AND status = ? AND last_download_at < ? AND ((source_id IN (?) AND type = ?) OR (type = ?))",
-		mid, consts.VIDEO_STATUS_DOWNLOAD_RETRY, last_time, subQuery, consts.VIDEO_TYPE_FAVOUR, consts.VIDEO_TYPE_WATCH_LATER,
+		"mid = ? AND status = ? AND last_download_at < ? AND ((source_id IN (?) AND type = ?) OR (type = ?)  OR (source_id IN (?) AND type = ?))",
+		mid, consts.VIDEO_STATUS_DOWNLOAD_RETRY, last_time, subQuery, consts.VIDEO_TYPE_FAVOUR, consts.VIDEO_TYPE_WATCH_LATER, subQueryCollected, consts.VIDEO_TYPE_COLLECTED,
 	).First(&video)
 	if video.ID == 0 {
 		return nil
@@ -119,23 +58,225 @@ func SetVideoStatus(id uint, status int) {
 	db.Save(&video)
 }
 
-func SetUserVideosStatus(mid int, status int) {
-	db := models.GetDB()
-	db.Model(&models.Videos{}).Where(
-		"mid = ? AND status != ?", mid, status,
-	).Updates(map[string]interface{}{"status": status})
-}
-
-func SetVideoErrorMessage(Mlid, Mid int, Bvid, Error string) {
+func SetVideoErrorMessage(SourceId, Mid, VideoType int, Bvid, Error string) {
 	logger := log.GetLogger()
 	logger.Errorf(Error)
 	db := models.GetDB()
 	errorInfo := models.VideoDownloadMessage{
-		Mlid:    Mlid,
-		Mid:     Mid,
-		Bvid:    Bvid,
-		Message: Error,
-		Type:    consts.VIDEO_MESSAGE_ERROR,
+		SourceId:  SourceId,
+		Mid:       Mid,
+		VideoType: VideoType,
+		Bvid:      Bvid,
+		Message:   Error,
+		Type:      consts.VIDEO_MESSAGE_ERROR,
 	}
 	db.Create(&errorInfo)
+}
+
+type Video struct {
+	SourceId int
+	Mid      int
+	Bvid     string
+	Cid      int
+	Type     int
+}
+
+type VideoInfo struct {
+	Bvid   string
+	Cid    int
+	Page   int
+	Title  string
+	Part   string
+	Width  int
+	Height int
+	Rotate int
+}
+
+func SetVideos(mid, source_id int, videos map[string]*Video, vType int) {
+	db := models.GetDB()
+	videosList := []models.Videos{}
+	db.Model(&models.Videos{}).Where(
+		&models.Videos{Mid: mid, Type: vType, SourceId: source_id},
+	).Find(&videosList)
+
+	existsVideoMap := make(map[string]*models.Videos)
+	for _, v := range videosList {
+		mapKey := fmt.Sprintf("%d_%s_%d", v.SourceId, v.Bvid, v.Cid)
+		existsVideoMap[mapKey] = &v
+
+	}
+	existsKeys := maps.Keys(existsVideoMap)
+	newKeys := maps.Keys(videos)
+
+	insertKeys := utils.Difference(newKeys, existsKeys)
+	deleteKeys := utils.Difference(existsKeys, newKeys)
+
+	deleteIds := make([]uint, 0)
+	if len(deleteKeys) > 0 {
+		for _, key := range deleteKeys {
+			if video, ok := existsVideoMap[key]; ok {
+				deleteIds = append(deleteIds, video.ID)
+			}
+		}
+		if len(deleteIds) > 0 {
+			times := int(math.Ceil(float64(len(deleteIds)) / 100))
+			for i := 0; i < times; i++ {
+				start := i * 100
+				end := i*100 + 100
+				if end > len(deleteIds) {
+					end = len(deleteIds)
+				}
+				db.Delete(&models.Videos{}, deleteIds[start:end])
+			}
+		}
+	}
+
+	if len(insertKeys) > 0 {
+		createList := []*models.Videos{}
+		for _, key := range insertKeys {
+			if video, ok := videos[key]; ok {
+				createList = append(createList, &models.Videos{
+					SourceId: video.SourceId,
+					Mid:      mid,
+					Bvid:     video.Bvid,
+					Cid:      video.Cid,
+					Type:     vType,
+					Status:   consts.VIDEO_STATUS_INIT,
+				})
+			}
+		}
+		if len(createList) > 0 {
+			db.CreateInBatches(createList, 100)
+		}
+	}
+}
+
+func SetVideosInfo(videosInfo map[string]*VideoInfo) {
+	db := models.GetDB()
+
+	bvids := make([]string, 0)
+	for _, v := range videosInfo {
+		bvids = append(bvids, v.Bvid)
+	}
+	existsVideosInfo := []models.VideosInfo{}
+	if len(bvids) > 0 {
+		times := int(math.Ceil(float64(len(bvids)) / 100))
+		for i := 0; i < times; i++ {
+			start := i * 100
+			end := i*100 + 100
+			if end > len(bvids) {
+				end = len(bvids)
+			}
+			bvidsSlice := bvids[start:end]
+			rangeVideosInfo := []models.VideosInfo{}
+			db.Model(&models.VideosInfo{}).Where(
+				"bvid IN (?)", bvidsSlice,
+			).Find(&rangeVideosInfo)
+			if len(rangeVideosInfo) > 0 {
+				existsVideosInfo = append(existsVideosInfo, rangeVideosInfo...)
+			}
+		}
+	}
+
+	existsVideosInfoMap := make(map[string]models.VideosInfo)
+	for _, v := range existsVideosInfo {
+		existsVideosInfoMap[fmt.Sprintf("%s_%d", v.Bvid, v.Cid)] = v
+	}
+
+	existsKeys := maps.Keys(existsVideosInfoMap)
+	newKeys := maps.Keys(videosInfo)
+
+	insertKeys := utils.Difference(newKeys, existsKeys)
+	updateKeys := utils.Intersection(newKeys, existsKeys)
+
+	if len(insertKeys) > 0 {
+		createList := []*models.VideosInfo{}
+		for _, key := range insertKeys {
+			if info, ok := videosInfo[key]; ok {
+				createList = append(createList, &models.VideosInfo{
+					Bvid:   info.Bvid,
+					Cid:    info.Cid,
+					Title:  info.Title,
+					Width:  info.Width,
+					Height: info.Height,
+					Rotate: info.Rotate,
+					Page:   info.Page,
+					Part:   info.Part,
+				})
+			}
+		}
+		if len(createList) > 0 {
+			db.CreateInBatches(createList, 100)
+		}
+	}
+
+	// TODO:信息先不删除，后面再想办法识别删除
+	// deleteKeys := utils.Difference(existsKeys, newKeys)
+	// if len(deleteKeys) > 0 {
+	// 	for _, key := range deleteKeys {
+	// 		if info, ok := existsVideosInfoMap[key]; ok {
+	// 			db.Delete(&info)
+	// 		}
+	// 	}
+	// }
+
+	if len(updateKeys) > 0 {
+		for _, key := range updateKeys {
+			info, ok1 := videosInfo[key]
+			if !ok1 {
+				continue
+			}
+			existsInfo, ok := existsVideosInfoMap[key]
+			if !ok {
+				continue
+			}
+			if existsInfo.Title != info.Title || existsInfo.Width != info.Width || existsInfo.Height != info.Height || existsInfo.Rotate != info.Rotate || existsInfo.Page != info.Page || existsInfo.Part != info.Part {
+				existsInfo.Part = info.Part
+				existsInfo.Page = info.Page
+				existsInfo.Title = info.Title
+				existsInfo.Width = info.Width
+				existsInfo.Height = info.Height
+				existsInfo.Rotate = info.Rotate
+				db.Save(existsInfo)
+			}
+		}
+	}
+}
+
+func AfterRefresh(mid int) {
+	db := models.GetDB()
+	subQueryFav := db.Model(&models.FavourFoldersInfo{}).Where(
+		&models.FavourFoldersInfo{Mid: mid, Sync: consts.FAVOUR_NEED_SYNC},
+	).Select("mlid")
+	subQueryCollected := db.Model(&models.CollectedInfo{}).Where(
+		&models.CollectedInfo{Mid: mid, Sync: consts.COLLECTED_NEED_SYNC},
+	).Select("coll_id")
+	subQueryVideo := db.Model(&models.Videos{}).Where(
+		"mid = ? AND status = ? AND ((source_id IN (?) AND type = ?) OR (source_id IN (?) AND type = ?))",
+		mid, consts.VIDEO_STATUS_INIT, subQueryFav, consts.VIDEO_TYPE_FAVOUR, subQueryCollected, consts.VIDEO_TYPE_COLLECTED,
+	).Select("id")
+
+	db.Model(&models.Videos{}).Where(
+		"id IN (?)", subQueryVideo,
+	).Update("status", consts.VIDEO_STATUS_TO_BE_DOWNLOAD)
+
+	var watchLaterSync int64
+	db.Model(&models.WatchLater{}).Where(&models.WatchLater{Mid: mid, Sync: consts.WATCH_LATER_NEED_SYNC}).Count(&watchLaterSync)
+
+	if watchLaterSync > 0 {
+		db.Model(&models.Videos{}).Where(
+			&models.Videos{
+				Mid:    mid,
+				Type:   consts.VIDEO_TYPE_WATCH_LATER,
+				Status: consts.VIDEO_STATUS_INIT,
+			},
+		).Update("status", consts.VIDEO_STATUS_TO_BE_DOWNLOAD)
+	}
+}
+
+func GetVideoInfo(bvid string, cid int) *VideoInfo {
+	var videoInfo VideoInfo
+	db := models.GetDB()
+	db.Model(&models.VideosInfo{}).Where(&models.VideosInfo{Bvid: bvid, Cid: cid}).First(&videoInfo)
+	return &videoInfo
 }

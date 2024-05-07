@@ -41,3 +41,8 @@ func SetWatchLaterSync(mid int, sync int) {
 	}
 	db.Save(&info)
 }
+
+func DelWatchLaterByMid(mid int) {
+	db := models.GetDB()
+	db.Where("mid = ?", mid).Delete(&models.WatchLater{})
+}

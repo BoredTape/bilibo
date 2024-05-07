@@ -70,3 +70,8 @@ func (t *TaskInfo) UpdateNextRunningAt(seconds int) {
 		},
 	)
 }
+
+func (t *TaskInfo) Delete() {
+	db := models.GetDB()
+	db.Delete(&models.Task{}, t.id)
+}
