@@ -14,7 +14,7 @@ jobs:
     name: Release
     runs-on: ${{ matrix.platform }}
     steps:
-      - name: 检查master分支
+      - name: 检出分支
         uses: actions/checkout@v4
 
       - name: Setup Go
@@ -52,9 +52,10 @@ jobs:
         id: get_version
         run: echo ::set-output name=VERSION::${GITHUB_REF/refs\/tags\//}
 
-      - name: Build and push
+      - name: Push
         uses: docker/build-push-action@v5
         with:
+          context: .
           push: true
           file: ./Dockerfile
           platforms: linux/amd64,linux/arm64
