@@ -46,8 +46,24 @@ MakeRelease() {
   cd ../..
 }
 
+BuildDocker () {
+  export GOOS=linux
+  export GOARCH=amd64
+  export CGO_ENABLED=1
+  export CC=musl-gcc
+  go build -ldflags '-s -w --extldflags "-static -fpic"' -o ./bin/bilibo_linux_amd64 -tags=jsoniter .
+  export GOOS=linux
+  export GOARCH=arm64
+  export CGO_ENABLED=1
+  export CC=~/aarch64-linux-musl-cross/bin/aarch64-linux-musl-gcc
+  go build -ldflags '-s -w --extldflags "-static -fpic"' -o ./bin/bilibo_linux_arm64 -tags=jsoniter .
+}
+
 if [ "$1" = "release" ]; then
   FetchWeb
   BuildRelease
   MakeRelease "md5.txt"
+elif [ "$1" = "docker" ]; then
+  FetchWeb
+  BuildDocker
 fi

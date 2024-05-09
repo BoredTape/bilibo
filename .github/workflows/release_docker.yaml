@@ -10,11 +10,31 @@ jobs:
     strategy:
       matrix:
         platform: [ubuntu-latest]
+        go-version: ["1.22"]
     name: Release
     runs-on: ${{ matrix.platform }}
     steps:
-      - name: 检出master分支
+      - name: 检查master分支
         uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go-version }}
+
+      - name: Install dependencies
+        run: |
+          sudo apt install musl-tools
+          sudo apt install wget
+
+      - name: Arm dependencies
+        run: |
+          wget -P ~ https://musl.cc/aarch64-linux-musl-cross.tgz
+          tar -xvf ~/aarch64-linux-musl-cross.tgz -C ~
+
+      - name: Build
+        run: |
+          bash build.sh docker
 
       - name: Setup QEMU
         uses: docker/setup-qemu-action@v3
