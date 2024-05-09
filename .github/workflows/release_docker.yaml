@@ -37,5 +37,5 @@ jobs:
         with:
           push: true
           file: ./Dockerfile
-          platforms: linux/amd64
+          platforms: linux/amd64,linux/arm64
           tags: "${{ secrets.DOCKER_REPOSITORY }}:${{ steps.get_version.outputs.VERSION }},${{ secrets.DOCKER_REPOSITORY }}:latest"
