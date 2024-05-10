@@ -5,8 +5,6 @@ import (
 	"bilibo/models"
 	"fmt"
 	"slices"
-
-	"golang.org/x/exp/maps"
 )
 
 func DelVideoByMid(mid int) {
@@ -49,15 +47,15 @@ func GetVideosByStatus(status, page, pageSize int) (*[]*VideoInfo, int64) {
 	if total > 0 {
 		var videos []models.Videos
 		query.Order("updated_at DESC").Limit(pageSize).Offset((page - 1) * pageSize).Find(&videos)
-		accountMap := make(map[int]*AccountInfo)
-		favMap := make(map[int]*FavourFolders)
-		collectedMap := make(map[int]*Collected)
+		accountMap := make(map[int]AccountInfo)
+		mids := make([]int, 0)
+		favMap := make(map[int]FavourFolders)
+		collectedMap := make(map[int]Collected)
 
 		videoBvids := make([]string, 0)
 		for _, v := range videos {
-			accountMap[v.Mid] = nil
-			if v.Type == consts.VIDEO_TYPE_FAVOUR {
-				favMap[v.SourceId] = nil
+			if !slices.Contains(mids, v.Mid) {
+				mids = append(mids, v.Mid)
 			}
 			if !slices.Contains(videoBvids, v.Bvid) {
 				videoBvids = append(videoBvids, v.Bvid)
@@ -65,9 +63,9 @@ func GetVideosByStatus(status, page, pageSize int) (*[]*VideoInfo, int64) {
 		}
 
 		var favourFolderInfos []models.FavourFoldersInfo
-		db.Where("mid IN (?)", maps.Keys(accountMap)).Find(&favourFolderInfos)
+		db.Where("mid IN (?)", mids).Find(&favourFolderInfos)
 		for _, v := range favourFolderInfos {
-			favMap[v.Mlid] = &FavourFolders{
+			favMap[v.Mlid] = FavourFolders{
 				Mlid:       v.Mlid,
 				Fid:        v.Fid,
 				Title:      v.Title,
@@ -77,9 +75,9 @@ func GetVideosByStatus(status, page, pageSize int) (*[]*VideoInfo, int64) {
 		}
 
 		var accountInfos []models.BiliAccounts
-		db.Where("mid IN (?)", maps.Keys(accountMap)).Find(&accountInfos)
+		db.Where("mid IN (?)", mids).Find(&accountInfos)
 		for _, v := range accountInfos {
-			accountMap[v.Mid] = &AccountInfo{
+			accountMap[v.Mid] = AccountInfo{
 				Mid:    v.Mid,
 				Status: v.Status,
 				Face:   v.Face,
@@ -88,9 +86,9 @@ func GetVideosByStatus(status, page, pageSize int) (*[]*VideoInfo, int64) {
 		}
 
 		var collectedInfos []models.CollectedInfo
-		db.Where("mid IN (?)", maps.Keys(accountMap)).Find(&collectedInfos)
+		db.Where("mid IN (?)", mids).Find(&collectedInfos)
 		for _, v := range collectedInfos {
-			collectedMap[v.Mid] = &Collected{
+			collectedMap[v.Mid] = Collected{
 				CollId:     v.CollId,
 				Attr:       v.Attr,
 				Title:      v.Title,
@@ -101,9 +99,9 @@ func GetVideosByStatus(status, page, pageSize int) (*[]*VideoInfo, int64) {
 
 		var videosInfo []models.VideosInfo
 		db.Model(&models.VideosInfo{}).Where("bvid IN (?)", videoBvids).Find(&videosInfo)
-		videoMap := make(map[string]*models.VideosInfo)
+		videoMap := make(map[string]models.VideosInfo)
 		for _, v := range videosInfo {
-			videoMap[fmt.Sprintf("%s_%d", v.Bvid, v.Cid)] = &v
+			videoMap[fmt.Sprintf("%s_%d", v.Bvid, v.Cid)] = v
 		}
 
 		for _, v := range videos {
@@ -122,8 +120,8 @@ func GetVideosByStatus(status, page, pageSize int) (*[]*VideoInfo, int64) {
 			}
 
 			accountName := ""
-			if accountMap[v.Mid] != nil {
-				accountName = accountMap[v.Mid].Uname
+			if accountInfo, ok := accountMap[v.Mid]; ok {
+				accountName = accountInfo.Uname
 			}
 			result = append(result, &VideoInfo{
 				Part:        fmt.Sprintf("P%d %s", videoInfo.Page, videoInfo.Part),
