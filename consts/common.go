@@ -5,6 +5,11 @@ import "errors"
 var ERROR_DOWNLOAD_403 = errors.New("download failed,status code: 403")
 
 const (
+	VIDEO_ATTR_NORMAL  = 0
+	VIDEO_ATTR_INVALID = 9
+)
+
+const (
 	WATCH_LATER_NOT_SYNC  = 0
 	WATCH_LATER_NEED_SYNC = 1
 )

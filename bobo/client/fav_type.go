@@ -119,7 +119,7 @@ type FavourList struct {
 			Name string `json:"name"` // UP主昵称
 			Face string `json:"face"` // UP主头像url
 		} `json:"upper"`
-		Attr    int      `json:"attr"` // 属性位（？）
+		Attr    int      `json:"attr"` // 属性位（？） 0：正常 9：失效-UP主删除
 		CntInfo struct { // 状态数
 			Collect int `json:"collect"` // 收藏数
 			Play    int `json:"play"`    // 播放数

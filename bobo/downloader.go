@@ -25,6 +25,10 @@ func downloadHandler(c *client.Client, video *models.Videos, basePath, path stri
 		services.SetVideoStatus(video.ID, videoStatus)
 		return
 	}
+	if !c.CheckVideo(video.Bvid) {
+		services.SetVideoStatus(video.ID, videoStatus)
+		return
+	}
 
 	tmpFilePath := filepath.Join(basePath, ".tmp")
 	fileName := fmt.Sprintf("%d_%d_%s_%d", mid, video.SourceId, video.Bvid, video.Cid)

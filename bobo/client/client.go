@@ -78,6 +78,9 @@ func (c *Client) RefreshWbiKey(nav *Navigation) error {
 	if len(c.cookies) < 1 {
 		return errors.New("未登录")
 	}
+	if nav == nil {
+		return errors.New("未获取到导航信息")
+	}
 	imgUrl := strings.Split(nav.WbiImg.ImgUrl, "/")
 	subUrl := strings.Split(nav.WbiImg.SubUrl, "/")
 	c.imgKey = strings.Split(imgUrl[len(imgUrl)-1], ".")[0]
@@ -160,4 +163,9 @@ func (c *Client) resty() *resty.Client {
 
 func (c *Client) GetResty() *resty.Client {
 	return c.resty()
+}
+
+func (c *Client) CheckVideo(bvid string) bool {
+	_, code, _ := c.GetVideoInfoByBvidCode(bvid)
+	return code == 0
 }
