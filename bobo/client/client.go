@@ -161,3 +161,8 @@ func (c *Client) resty() *resty.Client {
 func (c *Client) GetResty() *resty.Client {
 	return c.resty()
 }
+
+func (c *Client) CheckVideo(bvid string) bool {
+	_, code, _ := c.GetVideoInfoByBvidCode(bvid)
+	return code == 0
+}

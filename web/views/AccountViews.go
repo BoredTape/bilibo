@@ -20,6 +20,7 @@ import (
 func RegAccount(rg *gin.RouterGroup) {
 	account := rg.Group("account")
 	account.GET("list", accountList)
+	account.GET("settings/:mid", accountSettings)
 	account.POST("delete", accountDelete)
 	account.GET("save", accountSave)
 	account.GET("proxy/:mid", accountProxy)
@@ -64,6 +65,28 @@ func accountList(c *gin.Context) {
 	data["items"] = items
 
 	c.JSON(http.StatusOK, rsp)
+}
+
+func accountSettings(c *gin.Context) {
+	rsp := gin.H{
+		"data":    nil,
+		"message": "account not found",
+		"result":  999,
+	}
+	if midStr := c.Param("mid"); midStr == "" {
+		c.Status(404)
+	} else {
+		if mid, err := strconv.Atoi(midStr); err != nil {
+			rsp["message"] = "mid error:" + err.Error()
+		} else {
+			if data := services.GetAccountSettings(mid); data != nil {
+				rsp["data"] = data
+				rsp["message"] = "account settings"
+				rsp["result"] = 0
+			}
+		}
+		c.JSON(http.StatusOK, rsp)
+	}
 }
 
 type accountDeleteReq struct {

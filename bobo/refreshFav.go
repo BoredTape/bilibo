@@ -46,32 +46,42 @@ func (b *BoBo) RefreshFavVideo(mid int, data *client.AllFavourFolderInfo) map[st
 			for _, fav := range data.List {
 				videosMap := make(map[string]*services.Video)
 				mlid := fav.Id
-				if fret, err := client.GetFavourList(mlid, 0, "", "", 0, 20, 1, "web"); err == nil {
-					for _, media := range fret.Medias {
-						if vret, err := client.GetVideoInfoByBvid(media.BvId); err == nil {
-							for _, page := range vret.Pages {
-								videosMapKey := fmt.Sprintf("%d_%s_%d", mlid, media.BvId, page.Cid)
-								videosMap[videosMapKey] = &services.Video{
-									Bvid:     media.BvId,
-									SourceId: mlid,
-									Mid:      mid,
-									Cid:      page.Cid,
-									Type:     consts.VIDEO_TYPE_FAVOUR,
-								}
+				pn := 1
+				for {
+					if fret, err := client.GetFavourList(mlid, 0, "", "", 0, 20, pn, "web"); err == nil {
+						for _, media := range fret.Medias {
+							if vret, err := client.GetVideoInfoByBvid(media.BvId); err == nil {
+								for _, page := range vret.Pages {
+									videosMapKey := fmt.Sprintf("%d_%s_%d", mlid, media.BvId, page.Cid)
+									videosMap[videosMapKey] = &services.Video{
+										Bvid:     media.BvId,
+										SourceId: mlid,
+										Mid:      mid,
+										Cid:      page.Cid,
+										Type:     consts.VIDEO_TYPE_FAVOUR,
+									}
 
-								videosInfoMapKey := fmt.Sprintf("%s_%d", media.BvId, page.Cid)
-								videosInfoMap[videosInfoMapKey] = &services.VideoInfo{
-									Bvid:   media.BvId,
-									Cid:    page.Cid,
-									Page:   page.Page,
-									Title:  vret.Title,
-									Part:   page.Part,
-									Width:  vret.Dimension.Width,
-									Height: vret.Dimension.Height,
-									Rotate: vret.Dimension.Rotate,
+									videosInfoMapKey := fmt.Sprintf("%s_%d", media.BvId, page.Cid)
+									videosInfoMap[videosInfoMapKey] = &services.VideoInfo{
+										Bvid:   media.BvId,
+										Cid:    page.Cid,
+										Page:   page.Page,
+										Title:  vret.Title,
+										Part:   page.Part,
+										Width:  vret.Dimension.Width,
+										Height: vret.Dimension.Height,
+										Rotate: vret.Dimension.Rotate,
+									}
 								}
 							}
 						}
+						if fret.HasMore {
+							pn++
+						} else {
+							break
+						}
+					} else {
+						break
 					}
 				}
 				if len(videosMap) > 0 {

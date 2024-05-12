@@ -55,18 +55,38 @@ func (c *Client) GetVideoInfoByAvid(avid int) (*VideoInfo, error) {
 
 // GetVideoInfoByBvid 通过Bvid获取视频信息
 func (c *Client) GetVideoInfoByBvid(bvid string) (*VideoInfo, error) {
+	// resp, err := c.resty().R().SetHeader("Content-Type", "application/x-www-form-urlencoded").
+	// 	SetQueryParam("bvid", bvid).Get("https://api.bilibili.com/x/web-interface/view")
+	// if err != nil {
+	// 	return nil, errors.WithStack(err)
+	// }
+	// data, err := getRespData(resp, "获取视频详细信息")
+	// if err != nil {
+	// 	return nil, err
+	// }
+	// var ret *VideoInfo
+	// err = json.Unmarshal(data, &ret)
+	// return ret, errors.WithStack(err)
+	ret, _, err := c.GetVideoInfoByBvidCode(bvid)
+	return ret, err
+}
+
+func (c *Client) GetVideoInfoByBvidCode(bvid string) (*VideoInfo, int64, error) {
 	resp, err := c.resty().R().SetHeader("Content-Type", "application/x-www-form-urlencoded").
 		SetQueryParam("bvid", bvid).Get("https://api.bilibili.com/x/web-interface/view")
 	if err != nil {
-		return nil, errors.WithStack(err)
+		return nil, 0, errors.WithStack(err)
 	}
-	data, err := getRespData(resp, "获取视频详细信息")
+	data, code, err := getRespDataWithCode(resp, "获取视频详细信息")
 	if err != nil {
-		return nil, err
+		return nil, code, err
+	}
+	if code != 0 {
+		return nil, code, errors.New("获取视频详细信息失败，code: " + strconv.FormatInt(code, 10))
 	}
 	var ret *VideoInfo
 	err = json.Unmarshal(data, &ret)
-	return ret, errors.WithStack(err)
+	return ret, 0, errors.WithStack(err)
 }
 
 // GetVideoInfoByShortUrl 通过短链接获取视频信息
