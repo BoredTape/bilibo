@@ -1,12 +1,15 @@
 package services
 
 import (
+	"bilibo/config"
 	"bilibo/consts"
 	"bilibo/log"
 	"bilibo/models"
 	"bilibo/utils"
 	"fmt"
 	"math"
+	"os"
+	"path/filepath"
 	"time"
 
 	"golang.org/x/exp/maps"
@@ -99,10 +102,10 @@ func SetVideos(mid, source_id int, videos map[string]*Video, vType int) {
 		&models.Videos{Mid: mid, Type: vType, SourceId: source_id},
 	).Find(&videosList)
 
-	existsVideoMap := make(map[string]*models.Videos)
+	existsVideoMap := make(map[string]models.Videos)
 	for _, v := range videosList {
 		mapKey := fmt.Sprintf("%d_%s_%d", v.SourceId, v.Bvid, v.Cid)
-		existsVideoMap[mapKey] = &v
+		existsVideoMap[mapKey] = v
 
 	}
 	existsKeys := maps.Keys(existsVideoMap)
@@ -132,10 +135,10 @@ func SetVideos(mid, source_id int, videos map[string]*Video, vType int) {
 	}
 
 	if len(insertKeys) > 0 {
-		createList := []*models.Videos{}
+		createList := []models.Videos{}
 		for _, key := range insertKeys {
 			if video, ok := videos[key]; ok {
-				createList = append(createList, &models.Videos{
+				createList = append(createList, models.Videos{
 					SourceId: video.SourceId,
 					Mid:      mid,
 					Bvid:     video.Bvid,
@@ -147,6 +150,120 @@ func SetVideos(mid, source_id int, videos map[string]*Video, vType int) {
 		}
 		if len(createList) > 0 {
 			db.CreateInBatches(createList, 100)
+		}
+	}
+}
+
+type GroupVideo struct {
+	SourceId int
+	Mid      int
+	Bvid     string
+	Status   int
+	Type     int
+}
+
+type GroupVideoInfo struct {
+	Bvid  string
+	Title string
+}
+
+func SetInvalidVideos(mid, source_id int, bvids []string, vType int) {
+	logger := log.GetLogger()
+	db := models.GetDB()
+	videosList := []GroupVideo{}
+
+	if len(bvids) > 0 {
+		times := int(math.Ceil(float64(len(bvids)) / 100))
+		for i := 0; i < times; i++ {
+			start := i * 100
+			end := i*100 + 100
+			if end > len(bvids) {
+				end = len(bvids)
+			}
+			bvidsSlice := bvids[start:end]
+
+			rangeVideos := []GroupVideo{}
+
+			db.Model(&models.Videos{}).Select(
+				"mid", "type", "source_id", "status", "bvid",
+			).Where(&models.Videos{
+				Mid: mid, Type: vType, SourceId: source_id, Status: consts.VIDEO_STATUS_DOWNLOAD_DONE,
+			}).Where("bvid IN (?)", bvidsSlice).
+				Group("mid").
+				Group("type").
+				Group("source_id").
+				Group("status").
+				Group("bvid").
+				Find(&rangeVideos)
+
+			if len(rangeVideos) > 0 {
+				videosList = append(videosList, rangeVideos...)
+			}
+		}
+	}
+
+	if len(videosList) < 1 {
+		return
+	}
+
+	videoInfoList := []GroupVideoInfo{}
+	if len(bvids) > 0 {
+		times := int(math.Ceil(float64(len(bvids)) / 100))
+		for i := 0; i < times; i++ {
+			start := i * 100
+			end := i*100 + 100
+			if end > len(bvids) {
+				end = len(bvids)
+			}
+			bvidsSlice := bvids[start:end]
+			rangeVideosInfo := []GroupVideoInfo{}
+			db.Model(&models.VideosInfo{}).Select(
+				"bvid", "title",
+			).Where(
+				"bvid IN (?)", bvidsSlice,
+			).Group("bvid").Group("title").Find(&rangeVideosInfo)
+			if len(rangeVideosInfo) > 0 {
+				videoInfoList = append(videoInfoList, rangeVideosInfo...)
+			}
+		}
+	}
+
+	videoInfoMap := make(map[string]string)
+	for _, v := range videoInfoList {
+		videoInfoMap[v.Bvid] = v.Title
+	}
+
+	path := ""
+	basePath := config.GetConfig().Download.Path
+
+	if vType == consts.VIDEO_TYPE_COLLECTED {
+		collect := models.CollectedInfo{}
+		db.Model(&models.CollectedInfo{}).Where(&models.CollectedInfo{
+			Mid: mid, CollId: source_id,
+		}).First(&collect)
+		if collect.ID > 0 {
+			path = filepath.Join(utils.GetCollectedPath(mid, basePath), collect.Title)
+		}
+	} else if vType == consts.VIDEO_TYPE_WATCH_LATER {
+		path = utils.GetWatchLaterPath(mid, basePath)
+	} else if vType == consts.VIDEO_TYPE_FAVOUR {
+		folder := models.FavourFoldersInfo{}
+		db.Model(&models.FavourFoldersInfo{}).Where(&models.FavourFoldersInfo{
+			Mid: mid, Mlid: source_id,
+		}).First(&folder)
+		if folder.ID > 0 {
+			path = filepath.Join(utils.GetFavourPath(mid, basePath), folder.Title)
+		}
+	}
+	if path == "" {
+		return
+	}
+	for _, v := range videosList {
+		if videoInfoTitle, ok := videoInfoMap[v.Bvid]; ok {
+			beforePath := filepath.Join(path, utils.Name(videoInfoTitle))
+			distPath := filepath.Join(path, utils.Name(videoInfoTitle)+"[已失效]")
+			os.Rename(beforePath, distPath)
+			logger.Infof("%s -> %s", beforePath, distPath)
 		}
 	}
 }

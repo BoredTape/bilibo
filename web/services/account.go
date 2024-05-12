@@ -89,19 +89,16 @@ type Collected struct {
 }
 
 type AccountInfo struct {
-	Mid             int              `json:"mid"`
-	Uname           string           `json:"uname"`
-	Status          int              `json:"status"`
-	Face            string           `json:"face"`
-	FoldersCount    int              `json:"folders_count"`
-	Folders         []*FavourFolders `json:"folders"`
-	WatchLaterCount int64            `json:"watch_later_count"`
-	WatchLaterSync  int              `json:"watch_later_sync"`
-	Collected       []*Collected     `json:"collected"`
-	CollectedCount  int              `json:"collected_count"`
+	Mid             int    `json:"mid"`
+	Uname           string `json:"uname"`
+	Status          int    `json:"status"`
+	Face            string `json:"face"`
+	FoldersCount    int64  `json:"folders_count"`
+	WatchLaterCount int64  `json:"watch_later_count"`
+	CollectedCount  int64  `json:"collected_count"`
 }
 
-type AccountWatchLaterCount struct {
+type AccountCounts struct {
 	Mid   int   `json:"mid"`
 	Count int64 `json:"count"`
 }
@@ -129,60 +126,38 @@ func AccountList(page, pageSize int) (*[]*AccountInfo, int64) {
 					url.QueryEscape(data.Face),
 				),
 				Uname:           data.UName,
-				Folders:         make([]*FavourFolders, 0),
 				FoldersCount:    0,
 				WatchLaterCount: 0,
-				WatchLaterSync:  0,
 			}
 			accountMap[data.Mid] = &item
 			accountMids = append(accountMids, data.Mid)
 		}
 
-		var favourFolderInfos []models.FavourFoldersInfo
-		db.Model(&models.FavourFoldersInfo{}).Where("mid IN (?)", accountMids).Find(&favourFolderInfos)
-		for _, v := range favourFolderInfos {
-			folders := FavourFolders{
-				Mlid:       v.Mlid,
-				Fid:        v.Fid,
-				Title:      v.Title,
-				MediaCount: v.MediaCount,
-				Sync:       v.Sync,
-			}
-			accountMap[v.Mid].Folders = append(accountMap[v.Mid].Folders, &folders)
-			accountMap[v.Mid].FoldersCount++
+		var favourFolderCount []AccountCounts
+		db.Model(&models.FavourFoldersInfo{}).Select(
+			"COUNT(mid) AS count", "mid",
+		).Where("mid IN (?)", accountMids).Group("mid").Find(&favourFolderCount)
+		for _, v := range favourFolderCount {
+			accountMap[v.Mid].FoldersCount = v.Count
 		}
 
-		var collectedInfos []models.CollectedInfo
-		db.Model(&models.CollectedInfo{}).Where("mid IN (?)", accountMids).Find(&collectedInfos)
+		var collectedInfos []AccountCounts
+		db.Model(&models.CollectedInfo{}).Select(
+			"COUNT(mid) AS count", "mid",
+		).Where("mid IN (?)", accountMids).Group("mid").Find(&collectedInfos)
 		for _, v := range collectedInfos {
-			collected := Collected{
-				CollId:     v.CollId,
-				Attr:       v.Attr,
-				Title:      v.Title,
-				MediaCount: v.MediaCount,
-				Sync:       v.Sync,
-			}
-			accountMap[v.Mid].Collected = append(accountMap[v.Mid].Collected, &collected)
-			accountMap[v.Mid].CollectedCount++
+			accountMap[v.Mid].CollectedCount = v.Count
 		}
 
-		watchLaterCount := make([]AccountWatchLaterCount, 0)
-		db.Model(&models.Videos{}).Select("COUNT(mid) AS count", "mid").Where(
-			"mid IN (?) AND type = ?", accountMids,
+		var watchLaterCount []AccountCounts
+		db.Model(&models.Videos{}).Select(
+			"COUNT(mid) AS count", "mid",
+		).Where("mid IN (?) AND type = ?", accountMids,
 			consts.VIDEO_TYPE_WATCH_LATER,
 		).Group("mid").Find(&watchLaterCount)
 		for _, v := range watchLaterCount {
 			accountMap[v.Mid].WatchLaterCount = v.Count
 		}
-
-		watchLaterSync := make([]AccountWatchLaterSync, 0)
-		db.Model(&models.WatchLater{}).Select("sync", "mid").Where(
-			"mid IN (?)", accountMids,
-		).Find(&watchLaterSync)
-		for _, v := range watchLaterSync {
-			accountMap[v.Mid].WatchLaterSync = v.Sync
-		}
-
 	}
 	items := maps.Values(accountMap)
 	return &items, total
@@ -193,6 +168,34 @@ func AccountTotal() int64 {
 	var total int64
 	db.Model(&models.BiliAccounts{}).Count(&total)
 	return total
+}
+
+type AccountSettings struct {
+	Mid            int             `json:"mid"`
+	Folders        []FavourFolders `json:"folders"`
+	WatchLaterSync int             `json:"watch_later_sync"`
+	Collected      []Collected     `json:"collected"`
+}
+
+func GetAccountSettings(mid int) *AccountSettings {
+	db := models.GetDB()
+	watchLaterSync := AccountWatchLaterSync{}
+	db.Model(&models.WatchLater{}).Select("sync", "mid").Where(
+		"mid = ?", mid,
+	).First(&watchLaterSync)
+
+	var favourFolderInfos []FavourFolders
+	db.Model(&models.FavourFoldersInfo{}).Where("mid = ?", mid).Find(&favourFolderInfos)
+
+	var collectedInfos []Collected
+	db.Model(&models.CollectedInfo{}).Where("mid = ?", mid).Find(&collectedInfos)
+
+	return &AccountSettings{
+		Mid:            mid,
+		Folders:        favourFolderInfos,
+		WatchLaterSync: watchLaterSync.Sync,
+		Collected:      collectedInfos,
+	}
 }
 
 type AccountFile struct {
