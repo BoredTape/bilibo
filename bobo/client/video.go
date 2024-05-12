@@ -81,9 +81,6 @@ func (c *Client) GetVideoInfoByBvidCode(bvid string) (*VideoInfo, int64, error) 
 	if err != nil {
 		return nil, code, err
 	}
-	if code != 0 {
-		return nil, code, errors.New("获取视频详细信息失败，code: " + strconv.FormatInt(code, 10))
-	}
 	var ret *VideoInfo
 	err = json.Unmarshal(data, &ret)
 	return ret, 0, errors.WithStack(err)

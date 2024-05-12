@@ -6,6 +6,7 @@ import (
 	"bilibo/log"
 	"bilibo/services"
 	"fmt"
+	"slices"
 )
 
 func (b *BoBo) RefreshFav(mid int) *client.AllFavourFolderInfo {
@@ -45,12 +46,13 @@ func (b *BoBo) RefreshFavVideo(mid int, data *client.AllFavourFolderInfo) map[st
 		if data != nil {
 			for _, fav := range data.List {
 				videosMap := make(map[string]*services.Video)
+				invalidVideosBvidList := make([]string, 0)
 				mlid := fav.Id
 				pn := 1
 				for {
 					if fret, err := client.GetFavourList(mlid, 0, "", "", 0, 20, pn, "web"); err == nil {
 						for _, media := range fret.Medias {
-							if vret, err := client.GetVideoInfoByBvid(media.BvId); err == nil {
+							if vret, code, err := client.GetVideoInfoByBvidCode(media.BvId); err == nil {
 								for _, page := range vret.Pages {
 									videosMapKey := fmt.Sprintf("%d_%s_%d", mlid, media.BvId, page.Cid)
 									videosMap[videosMapKey] = &services.Video{
@@ -73,8 +75,14 @@ func (b *BoBo) RefreshFavVideo(mid int, data *client.AllFavourFolderInfo) map[st
 										Rotate: vret.Dimension.Rotate,
 									}
 								}
+							} else if code == 62002 {
+								logger.Infof("用户: %d 收藏夹: %s 无效视频bvid: %s", mid, fav.Title, media.BvId)
+								if !slices.Contains(invalidVideosBvidList, media.BvId) {
+									invalidVideosBvidList = append(invalidVideosBvidList, media.BvId)
+								}
 							}
 						}
+						logger.Infof("已获取 用户: %d 收藏夹: %s 第 %d 页数据", mid, fav.Title, pn)
 						if fret.HasMore {
 							pn++
 						} else {
@@ -83,6 +91,10 @@ func (b *BoBo) RefreshFavVideo(mid int, data *client.AllFavourFolderInfo) map[st
 					} else {
 						break
 					}
+				}
+				if len(invalidVideosBvidList) > 0 {
+					logger.Infof("用户: %d 收藏夹: %s 有 %d 个无效视频", mid, fav.Title, len(invalidVideosBvidList))
+					services.SetInvalidVideos(mid, mlid, invalidVideosBvidList, consts.VIDEO_TYPE_FAVOUR)
 				}
 				if len(videosMap) > 0 {
 					services.SetVideos(mid, mlid, videosMap, consts.VIDEO_TYPE_FAVOUR)

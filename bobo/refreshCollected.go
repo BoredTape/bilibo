@@ -6,6 +6,7 @@ import (
 	"bilibo/log"
 	"bilibo/services"
 	"fmt"
+	"slices"
 )
 
 func (b *BoBo) RefreshCollected(mid int) *client.CollectedInfo {
@@ -39,13 +40,15 @@ func (b *BoBo) RefreshCollectedVideo(mid int, data *client.CollectedInfo) map[st
 	logger := log.GetLogger()
 	logger.Infof("user: %d collected video list", mid)
 	videosInfoMap := make(map[string]*services.VideoInfo)
+
 	if client, err := b.GetClient(mid); err == nil {
 		if data != nil {
 			for _, collected := range data.List {
 				videosMap := make(map[string]*services.Video)
+				invalidVideosBvidList := make([]string, 0)
 				if fret, err := client.GetCollectedVideoList(collected.Id); err == nil {
 					for _, media := range fret.Medias {
-						if vret, err := client.GetVideoInfoByBvid(media.BvId); err == nil {
+						if vret, code, err := client.GetVideoInfoByBvidCode(media.BvId); err == nil {
 							for _, page := range vret.Pages {
 								videosMapKey := fmt.Sprintf("%d_%s_%d", collected.Id, media.BvId, page.Cid)
 								videosMap[videosMapKey] = &services.Video{
@@ -68,8 +71,17 @@ func (b *BoBo) RefreshCollectedVideo(mid int, data *client.CollectedInfo) map[st
 									Rotate: vret.Dimension.Rotate,
 								}
 							}
+						} else if code == 62002 {
+							logger.Infof("用户: %d 收藏和订阅: %s 无效视频bvid: %s", mid, collected.Title, media.BvId)
+							if !slices.Contains(invalidVideosBvidList, media.BvId) {
+								invalidVideosBvidList = append(invalidVideosBvidList, media.BvId)
+							}
 						}
 					}
+				}
+				if len(invalidVideosBvidList) > 0 {
+					logger.Infof("用户: %d 收藏和订阅: %s 有 %d 个无效视频", mid, collected.Title, len(invalidVideosBvidList))
+					services.SetInvalidVideos(mid, collected.Id, invalidVideosBvidList, consts.VIDEO_TYPE_COLLECTED)
 				}
 				if len(videosMap) > 0 {
 					services.SetVideos(mid, collected.Id, videosMap, consts.VIDEO_TYPE_COLLECTED)

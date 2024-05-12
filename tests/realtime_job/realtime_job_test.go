@@ -5,6 +5,7 @@ import (
 	"bilibo/consts"
 	"bilibo/models"
 	"bilibo/services"
+	"bilibo/tests"
 	"bilibo/utils"
 	"os"
 	"path/filepath"
@@ -184,7 +185,7 @@ func DeleteFavour(t *testing.T) {
 }
 
 func TestFileUtils(t *testing.T) {
-	Init()
+	tests.Init()
 	ChangeFavourName(t)
 	DeleteFavour(t)
 }
