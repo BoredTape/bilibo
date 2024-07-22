@@ -2,6 +2,7 @@
 package client
 
 import (
+	"bilibo/log"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -765,6 +766,7 @@ func (c *Client) GetWbiVideoPlayUrlByBvid(cid int, bvid string) (*DownloadInfo, 
 }
 
 func (c *Client) DownloadVideoBestByBvidCid(cid int, bvid, filePath, fileName string) (string, string, error) {
+	logger := log.GetLogger()
 	videoDownloadInfo, err := c.GetWbiVideoPlayUrlByBvid(cid, bvid)
 	if err != nil {
 		return "", "", err
@@ -773,7 +775,13 @@ func (c *Client) DownloadVideoBestByBvidCid(cid int, bvid, filePath, fileName st
 	if stream == nil || stream.Video == nil {
 		return "", "", errors.New("无可用视频流")
 	}
-	mimeType := strings.Split(stream.Video.MimeType, "/")[1]
+	mineTypeInfo := strings.Split(stream.Video.MimeType, "/")
+	if len(mineTypeInfo) < 2 {
+		msg := fmt.Sprintf("视频Bvid:[%s],无法获取视频类型:[%s]", bvid, stream.Video.MimeType)
+		logger.Error(msg)
+		return "", "", errors.New(msg)
+	}
+	mimeType := mineTypeInfo[1]
 	targetName := fmt.Sprintf("%s.%s", fileName, mimeType)
 	videoPath := filepath.Join(filePath, targetName)
 
