@@ -775,13 +775,19 @@ func (c *Client) DownloadVideoBestByBvidCid(cid int, bvid, filePath, fileName st
 	if stream == nil || stream.Video == nil {
 		return "", "", errors.New("无可用视频流")
 	}
-	mineTypeInfo := strings.Split(stream.Video.MimeType, "/")
-	if len(mineTypeInfo) < 2 {
+
+	mimeType := ""
+	sMimeType := strings.ToUpper(stream.Video.MimeType)
+	if strings.Contains(sMimeType, "MP4") {
+		mimeType = "mp4"
+	} else if strings.Contains(sMimeType, "FLV") {
+		mimeType = "flv"
+	} else {
 		msg := fmt.Sprintf("视频Bvid:[%s],无法获取视频类型:[%s]", bvid, stream.Video.MimeType)
 		logger.Error(msg)
 		return "", "", errors.New(msg)
 	}
-	mimeType := mineTypeInfo[1]
+
 	targetName := fmt.Sprintf("%s.%s", fileName, mimeType)
 	videoPath := filepath.Join(filePath, targetName)
 
